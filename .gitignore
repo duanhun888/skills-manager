@@ -1,0 +1,73 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies & frontend build
+node_modules
+dist
+dist-ssr
+.vite
+coverage
+*.local
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Environment variables (never commit real secrets)
+.env
+.env.*
+!.env.example
+
+# Local / production secrets
+**/*.pem
+**/*.key
+**/id_rsa
+**/id_ed25519
+credentials.json
+secrets.json
+*.p12
+*.pfx
+
+# Central API (private for now — deploy / keep in a private repo)
+server/
+
+# Built installers — publish via GitHub Releases, not git
+release/**
+!release/README.txt
+
+# Rust / Cargo (fallback; src-tauri/.gitignore also covers /target/)
+**/target/
+.target/
+.cargo/config.toml
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# OS / editor
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*~
+
+# Local agent / private notes (not for public repo)
+.claude
+docs
+reference
+CLAUDE.md
+.loop-log

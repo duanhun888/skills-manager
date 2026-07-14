@@ -1,0 +1,6 @@
+{
+  "passed": true,
+  "summary": "仅文档变更，跳过审查",
+  "findings": [],
+  "skill_version": "fixture-hash-skip-001"
+}

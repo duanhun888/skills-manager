@@ -1,0 +1,11 @@
+# Demo 试点 — 灰度模式，审查失败不阻断合并
+# 复制到新 GitLab 项目根目录
+
+stages:
+  - review
+
+variables:
+  SKILLS_REVIEW_SCRIPT: ".gitlab/skills-review.sh"
+
+include:
+  - local: ".gitlab/skills-review.yml"

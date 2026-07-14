@@ -1,0 +1,2579 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Search,
+  LayoutGrid,
+  List,
+  CheckCircle2,
+  Github,
+  HardDrive,
+  Globe,
+  Cloud,
+  Layers,
+  RefreshCw,
+  RotateCcw,
+  GitBranch,
+  History,
+  ArrowUpCircle,
+  Wrench,
+  Loader2,
+  X,
+  Plus,
+  SquareCheck,
+  Square,
+  GripVertical,
+  ChevronDown,
+  Pencil,
+  Trash2,
+  FileDown,
+} from "lucide-react";
+import { open as dialogOpen } from "@tauri-apps/plugin-dialog";
+import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
+import { cn } from "../utils";
+import { useApp } from "../context/AppContext";
+import { useMultiSelect } from "../hooks/useMultiSelect";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { TagRenameDialog } from "../components/TagRenameDialog";
+import { TagFilterDropdown } from "../components/TagFilterDropdown";
+import { DeleteSkillButton } from "../components/DeleteSkillButton";
+import { MultiSelectToolbar } from "../components/MultiSelectToolbar";
+import { BatchTagDialog } from "../components/BatchTagDialog";
+import { BatchCategoryDialog } from "../components/BatchCategoryDialog";
+import { GitSetupDialog } from "../components/GitSetupDialog";
+import { GitRecoveryDialog } from "../components/GitRecoveryDialog";
+import { SyncDots } from "../components/SyncDots";
+import { syncServerSkillCategory } from "../lib/skillSync";
+import {
+  exportUnsetCategoryReport,
+  isUncategorizedCategory,
+  type UnsetCategoryExportRow,
+} from "../lib/skillCategoryReport";
+import { useAuth } from "../context/useAuth";
+import { fetchServerSkills, getStoredToken, ServerCategoryUnsupportedError, type ServerSkill } from "../lib/serverApi";
+import { ManagedSkillAvatar } from "../components/ManagedSkillAvatar";
+import {
+  countSkillsByCentralStatus,
+  countSkillsByScope,
+  countSkillsBySourceFilter,
+  getManagedSkillCentralStatus,
+  matchesSourceFilter,
+  resolveLinkedProjectName,
+  resolveSkillScope,
+  resolveSkillVersionLabel,
+  skillHasDisplayVersion,
+  serverScopeBadgeClass,
+  SOURCE_FILTER_KEYS,
+  type ManagedSkillCentralStatus,
+} from "../lib/managedSkillDisplay";
+import {
+  SKILL_CATEGORY_IDS,
+  countSkillsByCategory,
+  countUncategorizedSkills,
+  skillCategoryBadgeClass,
+  skillCategoryLabelKey,
+  isSkillCategoryId,
+  type SkillCategoryId,
+} from "../lib/skillCategories";
+import * as api from "../lib/tauri";
+import { getLinkedServerProjectId } from "../lib/tauri";
+import { getTagColor, UNTAGGED_FILTER } from "../lib/skillTags";
+import type {
+  ManagedSkill,
+  ToolInfo,
+  GitBackupStatus,
+  GitBackupVersion,
+  GitUpstreamHealth,
+  SkillScope,
+} from "../lib/tauri";
+import { getErrorMessage, getErrorKind } from "../lib/error";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  rectSortingStrategy,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+
+interface SortableSkillItemProps {
+  id: string;
+  disabled: boolean;
+  className?: string;
+  children: (dragHandle: React.ReactNode) => React.ReactNode;
+}
+
+function SortableSkillItem({ id, disabled, className, children }: SortableSkillItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id, disabled });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : undefined,
+  };
+
+  const handle = !disabled ? (
+    <div
+      ref={setActivatorNodeRef}
+      {...listeners}
+      onClick={(e) => e.stopPropagation()}
+      className="flex cursor-grab items-center justify-center rounded p-1 text-faint transition-colors hover:bg-surface-hover hover:text-muted active:cursor-grabbing"
+    >
+      <GripVertical className="h-4 w-4" />
+    </div>
+  ) : null;
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} className={cn("h-full", className)}>
+      {children(handle)}
+    </div>
+  );
+}
+
+function getToolDisplayName(toolKey: string, tools: ToolInfo[]) {
+  return tools.find((tool) => tool.key === toolKey)?.display_name || toolKey;
+}
+
+function centralDirName(skill: ManagedSkill) {
+  return skill.central_path.split(/[\\/]/).filter(Boolean).pop() || skill.name;
+}
+
+function displaySnapshotLabel(tag: string) {
+  const raw = tag.startsWith("sm-v-") ? tag.slice("sm-v-".length) : tag;
+  const parts = raw.split("-");
+  if (parts.length < 3) return raw;
+  // Supported forms:
+  // 1) YYYYMMDD-HHMMSS-<short_sha>
+  // 2) YYYYMMDD-HHMMSS-<millis>-<short_sha>
+  return `${parts[0]}-${parts[1]}`;
+}
+
+export function MySkills() {
+  const { t } = useTranslation();
+  const { isServerMode, isAuthenticated, serverApiUrl } = useAuth();
+  const {
+    viewedPreset,
+    tools,
+    managedSkills: skills,
+    refreshPresets,
+    refreshManagedSkills,
+    detailSkillId,
+    openSkillDetailById,
+    closeSkillDetail,
+    projects,
+  } = useApp();
+
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [filterMode, setFilterMode] = useState<"all" | "enabled" | "available">("all");
+  const [scopeFilter, setScopeFilter] = useState<"all" | SkillScope>("all");
+  const [categoryFilter, setCategoryFilter] = useState<"all" | "unset" | SkillCategoryId>("all");
+  const [centralFilter, setCentralFilter] = useState<"all" | ManagedSkillCentralStatus>("all");
+  const [serverSkills, setServerSkills] = useState<ServerSkill[]>([]);
+  const [linkedServerProjectId, setLinkedServerProjectId] = useState<string | null>(null);
+  const [sourceFilters, setSourceFilters] = useState<Set<string>>(new Set());
+  const [tagFilters, setTagFilters] = useState<Set<string>>(new Set());
+  const [allTags, setAllTags] = useState<string[]>([]);
+  // Tag management from the filter bar (#233): right-click a tag pill to
+  // rename (dialog) or delete (confirm). Left-click stays "filter only".
+  const [tagMenu, setTagMenu] = useState<{ tag: string; x: number; y: number } | null>(null);
+  const [tagToRename, setTagToRename] = useState<string | null>(null);
+  const [tagToDelete, setTagToDelete] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  const refreshAfterDeleteRef = useRef<number | null>(null);
+  const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false);
+  const [batchTagDialogOpen, setBatchTagDialogOpen] = useState(false);
+  const [batchCategoryDialogOpen, setBatchCategoryDialogOpen] = useState(false);
+  const [batchCategorySaving, setBatchCategorySaving] = useState(false);
+  const [exportingCategoryReport, setExportingCategoryReport] = useState(false);
+  const [checkingAll, setCheckingAll] = useState(false);
+  const [checkingSkillId, setCheckingSkillId] = useState<string | null>(null);
+  const [updatingSkillId, setUpdatingSkillId] = useState<string | null>(null);
+  const [batchUpdating, setBatchUpdating] = useState(false);
+  const [togglingTarget, setTogglingTarget] = useState<{ skillId: string; tool: string } | null>(null);
+  const [gitStatus, setGitStatus] = useState<GitBackupStatus | null>(null);
+  const [gitLoading, setGitLoading] = useState<string | null>(null); // "start" | "sync"
+  const [gitRemoteConfig, setGitRemoteConfig] = useState("");
+  const [gitVersionsOpen, setGitVersionsOpen] = useState(false);
+  const [gitVersionsLoading, setGitVersionsLoading] = useState(false);
+  const [gitVersions, setGitVersions] = useState<GitBackupVersion[]>([]);
+  const [restoreVersionTag, setRestoreVersionTag] = useState<string | null>(null);
+  const [restoringVersionTag, setRestoringVersionTag] = useState<string | null>(null);
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
+  // What the recovery dialog should explain. A merge conflict is not an
+  // upstream-health value, so it gets its own reason rather than being forced
+  // into `gitStatus.upstream_health` (which stays "healthy" during a conflict).
+  const [recoveryReason, setRecoveryReason] = useState<GitUpstreamHealth | "conflict">(
+    "unrelated_histories"
+  );
+  const [tagEditSkillId, setTagEditSkillId] = useState<string | null>(null);
+  const [tagInput, setTagInput] = useState("");
+  const tagInputRef = useRef<HTMLInputElement>(null);
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
+
+  const [presetSkillOrder, setPresetSkillOrder] = useState<string[]>([]);
+
+  const viewedPresetName = viewedPreset?.name || t("mySkills.currentPresetFallback");
+
+  // Fetch sort order whenever active preset changes
+  useEffect(() => {
+    if (!viewedPreset) {
+      setPresetSkillOrder([]);
+      return;
+    }
+    api.getPresetSkillOrder(viewedPreset.id).then(setPresetSkillOrder).catch(() => {});
+  }, [viewedPreset, skills]);
+
+  const refreshAllTags = async () => {
+    try {
+      const tags = await api.getAllTags();
+      setAllTags(tags);
+    } catch {
+      // not critical
+    }
+  };
+
+  useEffect(() => {
+    refreshAllTags();
+  }, [skills]);
+
+  // Close the tag context menu on Escape (click-outside is handled by its backdrop).
+  useEffect(() => {
+    if (!tagMenu) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setTagMenu(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [tagMenu]);
+
+  useEffect(() => {
+    if (!isServerMode || !isAuthenticated) {
+      setServerSkills([]);
+      setLinkedServerProjectId(null);
+      return;
+    }
+    const token = getStoredToken();
+    if (!token) {
+      setServerSkills([]);
+      return;
+    }
+    let cancelled = false;
+    void fetchServerSkills(serverApiUrl, token)
+      .then((list) => {
+        if (!cancelled) setServerSkills(list);
+      })
+      .catch(() => {
+        if (!cancelled) setServerSkills([]);
+      });
+    void getLinkedServerProjectId()
+      .then((id) => {
+        if (!cancelled) setLinkedServerProjectId(id);
+      })
+      .catch(() => {
+        if (!cancelled) setLinkedServerProjectId(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isServerMode, isAuthenticated, serverApiUrl, skills]);
+
+  const serverSkillById = useMemo(() => {
+    const map = new Map<string, ServerSkill>();
+    for (const item of serverSkills) {
+      map.set(item.id, item);
+    }
+    return map;
+  }, [serverSkills]);
+
+  const scopeCounts = useMemo(() => countSkillsByScope(skills), [skills]);
+  const categoryCounts = useMemo(() => countSkillsByCategory(skills), [skills]);
+  const uncategorizedCount = useMemo(() => countUncategorizedSkills(skills), [skills]);
+  const uncategorizedExportRows = useMemo((): UnsetCategoryExportRow[] => {
+    return skills
+      .filter((skill) => isUncategorizedCategory(skill.category))
+      .map((skill) => ({
+        name: skill.name,
+        scope: resolveSkillScope(skill),
+        source: skill.source_type,
+        identifier: skill.central_path,
+        description: skill.description,
+      }));
+  }, [skills]);
+  const centralCounts = useMemo(() => countSkillsByCentralStatus(skills), [skills]);
+  const sourceCounts = useMemo(() => countSkillsBySourceFilter(skills), [skills]);
+  const sourceFilterOptions = useMemo(
+    () => SOURCE_FILTER_KEYS.filter((key) => sourceCounts[key] > 0),
+    [sourceCounts]
+  );
+  const showSourceFilterRow = sourceFilterOptions.length > 1;
+
+  const advancedFilterCount = useMemo(() => {
+    let count = 0;
+    if (scopeFilter !== "all") count++;
+    if (categoryFilter !== "all") count++;
+    if (centralFilter !== "all") count++;
+    count += sourceFilters.size;
+    count += tagFilters.size;
+    return count;
+  }, [scopeFilter, categoryFilter, centralFilter, sourceFilters, tagFilters]);
+
+  useEffect(() => {
+    if (advancedFilterCount > 0) {
+      setAdvancedFiltersOpen(true);
+    }
+  }, [advancedFilterCount]);
+
+  const clearAdvancedFilters = useCallback(() => {
+    setScopeFilter("all");
+    setCategoryFilter("all");
+    setCentralFilter("all");
+    setSourceFilters(new Set());
+    setTagFilters(new Set());
+  }, []);
+
+  useEffect(() => {
+    if (sourceFilters.size === 0) return;
+    const allowed = new Set<string>(sourceFilterOptions);
+    const migrated = new Set<string>();
+    for (const key of sourceFilters) {
+      if (key === "import") migrated.add("local");
+      else if (allowed.has(key)) migrated.add(key);
+    }
+    if (
+      migrated.size !== sourceFilters.size ||
+      [...migrated].some((k) => !sourceFilters.has(k))
+    ) {
+      setSourceFilters(migrated);
+    }
+  }, [sourceFilterOptions, sourceFilters]);
+  const linkedProjectName = useMemo(
+    () => resolveLinkedProjectName(projects, linkedServerProjectId),
+    [projects, linkedServerProjectId]
+  );
+
+  const toggleFilter = (set: Set<string>, value: string): Set<string> => {
+    const next = new Set(set);
+    if (next.has(value)) next.delete(value);
+    else next.add(value);
+    return next;
+  };
+
+  const skillDisplayNames = useMemo(() => {
+    const nameCounts = new Map<string, number>();
+    for (const skill of skills) {
+      nameCounts.set(skill.name, (nameCounts.get(skill.name) || 0) + 1);
+    }
+
+    const displayNames = new Map<string, string>();
+    for (const skill of skills) {
+      const dirName = centralDirName(skill);
+      displayNames.set(
+        skill.id,
+        (nameCounts.get(skill.name) || 0) > 1 && dirName !== skill.name
+          ? dirName
+          : skill.name
+      );
+    }
+    return displayNames;
+  }, [skills]);
+
+  const filtered = useMemo(() => {
+    const result = skills.filter((skill) => {
+      const displayName = skillDisplayNames.get(skill.id) || skill.name;
+      const matchesSearch =
+        skill.name.toLowerCase().includes(search.toLowerCase()) ||
+        displayName.toLowerCase().includes(search.toLowerCase()) ||
+        (skill.description || "").toLowerCase().includes(search.toLowerCase());
+      if (!matchesSearch) return false;
+
+      if (scopeFilter !== "all" && resolveSkillScope(skill) !== scopeFilter) return false;
+
+      if (categoryFilter === "unset") {
+        if (skill.category && isSkillCategoryId(skill.category)) return false;
+      } else if (categoryFilter !== "all" && skill.category !== categoryFilter) {
+        return false;
+      }
+
+      if (
+        centralFilter !== "all" &&
+        getManagedSkillCentralStatus(skill) !== centralFilter
+      ) {
+        return false;
+      }
+
+      if (sourceFilters.size > 0 && !matchesSourceFilter(skill, sourceFilters)) return false;
+
+      if (tagFilters.size > 0) {
+        const wantUntagged = tagFilters.has(UNTAGGED_FILTER);
+        const matchUntagged = wantUntagged && skill.tags.length === 0;
+        const matchTag = skill.tags.some((t) => tagFilters.has(t));
+        if (!matchUntagged && !matchTag) return false;
+      }
+
+      if (!viewedPreset) return true;
+
+      const enabledInPreset = skill.preset_ids.includes(viewedPreset.id);
+      if (filterMode === "enabled") return enabledInPreset;
+      if (filterMode === "available") return !enabledInPreset;
+      return true;
+    });
+
+    // Always sort enabled skills first; within enabled group, use custom sort order
+    if (viewedPreset) {
+      result.sort((a, b) => {
+        const aEnabled = a.preset_ids.includes(viewedPreset.id) ? 0 : 1;
+        const bEnabled = b.preset_ids.includes(viewedPreset.id) ? 0 : 1;
+        if (aEnabled !== bEnabled) return aEnabled - bEnabled;
+        // Within same group, use preset sort order
+        const aOrder = presetSkillOrder.indexOf(a.id);
+        const bOrder = presetSkillOrder.indexOf(b.id);
+        if (aOrder !== -1 && bOrder !== -1) return aOrder - bOrder;
+        if (aOrder !== -1) return -1;
+        if (bOrder !== -1) return 1;
+        return a.name.localeCompare(b.name);
+      });
+    }
+
+    return result;
+  }, [skills, skillDisplayNames, search, scopeFilter, categoryFilter, centralFilter, sourceFilters, tagFilters, filterMode, viewedPreset, presetSkillOrder]);
+
+  const {
+    isMultiSelect, setIsMultiSelect,
+    selectedIds,
+    toggleSelect,
+    isAllSelected,
+    anyDisabled,
+    handleSelectAll,
+    exitMultiSelect,
+  } = useMultiSelect({
+    items: skills,
+    filtered,
+    getKey: (s) => s.id,
+    isItemActive: (s) => viewedPreset ? s.preset_ids.includes(viewedPreset.id) : true,
+  });
+
+  const selectedSkill = useMemo(
+    () => skills.find((skill) => skill.id === detailSkillId) || null,
+    [detailSkillId, skills]
+  );
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDragEnd = useCallback(
+    async (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id || !viewedPreset) return;
+
+      // Only reorder enabled skills (they are always at the front)
+      const enabledSkills = filtered.filter((s) => s.preset_ids.includes(viewedPreset.id));
+      const oldIndex = enabledSkills.findIndex((s) => s.id === active.id);
+      const newIndex = enabledSkills.findIndex((s) => s.id === over.id);
+      if (oldIndex === -1 || newIndex === -1) return;
+
+      const reordered = [...enabledSkills];
+      const [moved] = reordered.splice(oldIndex, 1);
+      reordered.splice(newIndex, 0, moved);
+
+      // Optimistic update
+      setPresetSkillOrder(reordered.map((s) => s.id));
+
+      try {
+        await api.reorderPresetSkills(viewedPreset.id, reordered.map((s) => s.id));
+      } catch {
+        // Revert on failure
+        await api.getPresetSkillOrder(viewedPreset.id).then(setPresetSkillOrder).catch(() => {});
+      }
+    },
+    [filtered, viewedPreset]
+  );
+
+  const canDrag = !!viewedPreset;
+
+  const mapGitError = (error: unknown) => {
+    const kind = getErrorKind(error);
+    const message = getErrorMessage(error, "");
+
+    if (kind === "network") {
+      return t("settings.gitErrorNetwork");
+    }
+
+    if (
+      message.includes("Authentication failed")
+      || message.includes("Permission denied")
+      || message.includes("could not read Username")
+    ) {
+      return t("settings.gitErrorAuth");
+    }
+    if (
+      message.includes("Could not resolve host")
+      || message.includes("Failed to connect")
+      || message.includes("Connection timed out")
+      || /connection\s+refused/i.test(message)
+    ) {
+      return t("settings.gitErrorNetwork");
+    }
+    // Order matters: check specific reject reasons before the generic conflict keyword.
+    if (message.includes("unrelated histories") || message.includes("refusing to merge")) {
+      return t("settings.gitErrorUnrelatedHistories");
+    }
+    if (
+      message.includes("[rejected]")
+      || message.includes("non-fast-forward")
+      || message.includes("fetch first")
+      || message.includes("failed to push some refs")
+    ) {
+      return t("settings.gitErrorRejected");
+    }
+    if (message.includes("no upstream") || message.includes("has no upstream branch")) {
+      return t("settings.gitErrorNoUpstream");
+    }
+    if (message.includes("CONFLICT") || message.includes("conflict")) {
+      return t("settings.gitErrorConflict");
+    }
+    if (message.includes("not a git repository")) {
+      return t("settings.gitErrorNotRepo");
+    }
+    const fallback = t("settings.gitErrorGeneric");
+    const detail = message.trim();
+    if (detail && detail !== "Error") {
+      return `${fallback} (${detail})`;
+    }
+    return fallback;
+  };
+
+  // A merge conflict (or a leftover MERGE_HEAD from an older build, which the
+  // backend tags as SYNC_CONFLICT): the merge has been aborted, so the only
+  // safe in-app fix is to re-clone from remote. Deliberately does NOT match the
+  // generic "already in progress" message, which also covers non-conflict
+  // interruptions like a stale index.lock.
+  const isSyncConflictError = (error: unknown) => {
+    const message = getErrorMessage(error, "");
+    return message.includes("SYNC_CONFLICT") || message.includes("CONFLICT");
+  };
+
+  // Detect errors that mean "the local repo's relationship to remote needs structural repair".
+  const isRecoverableSetupError = (error: unknown) => {
+    const message = getErrorMessage(error, "");
+    return (
+      message.includes("unrelated histories")
+      || message.includes("refusing to merge")
+      || message.includes("[rejected]")
+      || message.includes("non-fast-forward")
+      || message.includes("fetch first")
+      || message.includes("failed to push some refs")
+      || message.includes("no upstream")
+      || isSyncConflictError(error)
+    );
+  };
+
+  const refreshGitStatus = useCallback(async () => {
+    try {
+      await api.gitBackupFetch().catch(() => {});
+      const status = await api.gitBackupStatus();
+      setGitStatus(status);
+    } catch {
+      // not critical
+    }
+  }, []);
+
+  // Local-only status refresh: no `git fetch`, so it can fire from
+  // dependency-driven effects without driving the file-watcher → refresh
+  // → fetch feedback loop.
+  const refreshGitStatusLocal = useCallback(async () => {
+    try {
+      const status = await api.gitBackupStatus();
+      setGitStatus(status);
+    } catch {
+      // not critical
+    }
+  }, []);
+
+  const refreshGitVersions = useCallback(async () => {
+    if (!gitStatus?.is_repo) {
+      setGitVersions([]);
+      return;
+    }
+    setGitVersionsLoading(true);
+    try {
+      const versions = await api.gitBackupListVersions(30);
+      setGitVersions(versions);
+    } catch {
+      setGitVersions([]);
+    } finally {
+      setGitVersionsLoading(false);
+    }
+  }, [gitStatus?.is_repo]);
+
+  useEffect(() => {
+    (async () => {
+      const savedRemote = (await api.getSettings("git_backup_remote_url").catch(() => null))?.trim() || "";
+      const status = await api.gitBackupStatus().catch(() => null);
+      setGitStatus(status);
+
+      if (savedRemote) {
+        setGitRemoteConfig(savedRemote);
+        return;
+      }
+
+      const detectedRemote = status?.remote_url?.trim() || "";
+      if (detectedRemote) {
+        setGitRemoteConfig(detectedRemote);
+        api.setSettings("git_backup_remote_url", detectedRemote).catch(() => {});
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    const handleWindowFocus = () => {
+      refreshGitStatus();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshGitStatus();
+      }
+    };
+
+    window.addEventListener("focus", handleWindowFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("focus", handleWindowFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [refreshGitStatus]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      refreshGitStatusLocal();
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [skills, refreshGitStatusLocal]);
+
+  useEffect(() => {
+    if (gitVersionsOpen && gitStatus?.is_repo) {
+      refreshGitVersions();
+    }
+  }, [gitVersionsOpen, gitStatus?.is_repo, refreshGitVersions]);
+
+  const handleToggleSkillTarget = useCallback(
+    async (skill: ManagedSkill, toolKey: string, enabled: boolean) => {
+      if (togglingTarget) return;
+      setTogglingTarget({ skillId: skill.id, tool: toolKey });
+      const displayName = getToolDisplayName(toolKey, tools);
+      try {
+        if (enabled) {
+          await api.syncSkillToTool(skill.id, toolKey);
+          toast.success(t("mySkills.targetInstalled", { name: skill.name, agent: displayName }));
+        } else {
+          await api.unsyncSkillFromTool(skill.id, toolKey);
+          toast.success(t("mySkills.targetUninstalled", { name: skill.name, agent: displayName }));
+        }
+        await refreshManagedSkills();
+      } catch (error: unknown) {
+        toast.error(getErrorMessage(error, t("common.error")));
+        await refreshManagedSkills();
+      } finally {
+        setTogglingTarget(null);
+      }
+    },
+    [togglingTarget, tools, t, refreshManagedSkills]
+  );
+
+  const scheduleRefreshAfterDelete = useCallback(() => {
+    if (refreshAfterDeleteRef.current !== null) {
+      window.clearTimeout(refreshAfterDeleteRef.current);
+    }
+    refreshAfterDeleteRef.current = window.setTimeout(() => {
+      refreshAfterDeleteRef.current = null;
+      void Promise.all([refreshManagedSkills(), refreshPresets()]);
+    }, 300);
+  }, [refreshManagedSkills, refreshPresets]);
+
+  useEffect(() => {
+    return () => {
+      if (refreshAfterDeleteRef.current !== null) {
+        window.clearTimeout(refreshAfterDeleteRef.current);
+      }
+    };
+  }, []);
+
+  const handleDeleteSkill = useCallback(
+    (skill: ManagedSkill) => {
+      setDeletingIds((prev) => {
+        if (prev.has(skill.id)) return prev;
+        const next = new Set(prev);
+        next.add(skill.id);
+        return next;
+      });
+      void (async () => {
+        try {
+          await api.deleteManagedSkill(skill.id);
+          if (selectedSkill?.id === skill.id) closeSkillDetail();
+          toast.success(`${skill.name} ${t("mySkills.deleted")}`);
+        } catch (error: unknown) {
+          toast.error(getErrorMessage(error, t("common.error")));
+        } finally {
+          setDeletingIds((prev) => {
+            if (!prev.has(skill.id)) return prev;
+            const next = new Set(prev);
+            next.delete(skill.id);
+            return next;
+          });
+          scheduleRefreshAfterDelete();
+        }
+      })();
+    },
+    [selectedSkill, closeSkillDetail, t, scheduleRefreshAfterDelete]
+  );
+
+  const handleBatchDelete = async () => {
+    const ids = Array.from(selectedIds);
+    try {
+      const result = await api.deleteManagedSkills(ids);
+      if (selectedSkill && ids.includes(selectedSkill.id) && !result.failed.includes(selectedSkill.id)) {
+        closeSkillDetail();
+      }
+      if (result.deleted > 0) {
+        toast.success(t("mySkills.batchDeleted", { count: result.deleted }));
+      }
+      if (result.failed.length > 0) {
+        toast.error(t("mySkills.batchDeleteFailed", { count: result.failed.length }));
+      }
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t("common.error")));
+    } finally {
+      exitMultiSelect();
+      setBatchDeleteConfirm(false);
+      await Promise.all([refreshManagedSkills(), refreshPresets()]);
+    }
+  };
+
+  const handleBatchEditTags = async (adds: string[], removes: string[]) => {
+    const selectedSkillsList = skills.filter((s) => selectedIds.has(s.id));
+    let updated = 0;
+    let failed = 0;
+    for (const skill of selectedSkillsList) {
+      const removeSet = new Set(removes);
+      const remaining = skill.tags.filter((tag) => !removeSet.has(tag));
+      const merged = [...remaining];
+      for (const tag of adds) {
+        if (!merged.includes(tag)) merged.push(tag);
+      }
+      const changed =
+        merged.length !== skill.tags.length ||
+        merged.some((tag, i) => tag !== skill.tags[i]);
+      if (!changed) continue;
+      try {
+        await api.setSkillTags(skill.id, merged);
+        updated++;
+      } catch {
+        failed++;
+      }
+    }
+    if (updated > 0) {
+      toast.success(t("mySkills.batchTagsUpdated", { count: updated }));
+    }
+    if (failed > 0) {
+      toast.error(t("mySkills.batchTagsFailed", { count: failed }));
+    }
+    await refreshManagedSkills();
+    await refreshAllTags();
+  };
+
+  const handleBatchSetCategory = async (category: SkillCategoryId) => {
+    const selectedSkillsList = skills.filter((s) => selectedIds.has(s.id));
+    setBatchCategorySaving(true);
+    let updated = 0;
+    let failed = 0;
+    try {
+      for (const skill of selectedSkillsList) {
+        if (skill.category === category) continue;
+        try {
+          const result = await api.setSkillCategory(skill.id, category);
+          if (
+            isServerMode &&
+            isAuthenticated &&
+            serverApiUrl &&
+            result.server_skill_id
+          ) {
+            try {
+              await syncServerSkillCategory(serverApiUrl, result);
+            } catch (error) {
+              if (error instanceof ServerCategoryUnsupportedError) {
+                toast.error(t("install.server.categoryServerOutdated"));
+              }
+            }
+          }
+          updated++;
+        } catch {
+          failed++;
+        }
+      }
+      if (updated > 0) {
+        toast.success(t("mySkills.batchCategoryUpdated", { count: updated }));
+      }
+      if (failed > 0) {
+        toast.error(t("mySkills.batchCategoryFailed", { count: failed }));
+      }
+      await refreshManagedSkills();
+      if (updated > 0) {
+        setBatchCategoryDialogOpen(false);
+      }
+    } finally {
+      setBatchCategorySaving(false);
+    }
+  };
+
+  const handleBatchTogglePreset = async () => {
+    if (!viewedPreset) return;
+    const selectedSkillsList = skills.filter((s) => selectedIds.has(s.id));
+    const enabling = anyDisabled;
+    let count = 0;
+    let failed = 0;
+    for (const skill of selectedSkillsList) {
+      try {
+        const enabledInPreset = skill.preset_ids.includes(viewedPreset.id);
+        if (enabling && !enabledInPreset) {
+          await api.addSkillToPreset(skill.id, viewedPreset.id);
+          count++;
+        } else if (!enabling && enabledInPreset) {
+          await api.removeSkillFromPreset(skill.id, viewedPreset.id);
+          count++;
+        }
+      } catch {
+        failed++;
+        // continue with remaining
+      }
+    }
+    if (count > 0) {
+      toast.success(enabling
+        ? t("mySkills.batchEnabled", { count })
+        : t("mySkills.batchDisabled", { count }));
+    }
+    if (failed > 0) {
+      toast.error(t("mySkills.batchToggleFailed", { count: failed }));
+    }
+    await Promise.all([refreshManagedSkills(), refreshPresets()]);
+  };
+
+  const handleBatchRefresh = async () => {
+    const refreshableSkills = skills.filter((skill) => selectedIds.has(skill.id) && canRefresh(skill));
+    if (refreshableSkills.length === 0) return;
+
+    setBatchUpdating(true);
+    try {
+      const result = await api.batchUpdateSkills(refreshableSkills.map((skill) => skill.id));
+      if (result.refreshed > 0) {
+        toast.success(t("mySkills.batchUpdated", { count: result.refreshed }));
+      }
+      if (result.unchanged > 0) {
+        toast.info(t("mySkills.batchAlreadyUpToDate", { count: result.unchanged }));
+      }
+      if (result.failed.length > 0) {
+        toast.error(t("mySkills.batchUpdateFailed", { count: result.failed.length }));
+      }
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t("common.error")));
+    } finally {
+      await refreshManagedSkills();
+      setBatchUpdating(false);
+    }
+  };
+
+  const handleUpdateAvailableSkills = async () => {
+    const updatableSkills = skills.filter(
+      (skill) => skill.update_status === "update_available" && canRefresh(skill)
+    );
+    if (updatableSkills.length === 0) return;
+
+    setBatchUpdating(true);
+    try {
+      const result = await api.batchUpdateSkills(updatableSkills.map((skill) => skill.id));
+      if (result.refreshed > 0) {
+        toast.success(t("mySkills.batchUpdated", { count: result.refreshed }));
+      }
+      if (result.unchanged > 0) {
+        toast.info(t("mySkills.batchAlreadyUpToDate", { count: result.unchanged }));
+      }
+      if (result.failed.length > 0) {
+        toast.error(t("mySkills.batchUpdateFailed", { count: result.failed.length }));
+      }
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t("common.error")));
+    } finally {
+      await refreshManagedSkills();
+      setBatchUpdating(false);
+    }
+  };
+
+  const handleTogglePreset = async (skill: ManagedSkill) => {
+    if (!viewedPreset) return;
+    const enabledInPreset = skill.preset_ids.includes(viewedPreset.id);
+    if (enabledInPreset) {
+      await api.removeSkillFromPreset(skill.id, viewedPreset.id);
+      toast.success(`${skill.name} ${t("mySkills.disabledInPreset")}`);
+    } else {
+      await api.addSkillToPreset(skill.id, viewedPreset.id);
+      toast.success(`${skill.name} ${t("mySkills.enabledInPreset")}`);
+    }
+    await Promise.all([refreshManagedSkills(), refreshPresets()]);
+  };
+
+  const handleCheckAllUpdates = async () => {
+    setCheckingAll(true);
+    try {
+      await api.checkAllSkillUpdates(true);
+      toast.success(t("mySkills.updateActions.checkedAll"));
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t("common.error")));
+    } finally {
+      await refreshManagedSkills();
+      setCheckingAll(false);
+    }
+  };
+
+  const handleCheckUpdate = async (skill: ManagedSkill) => {
+    setCheckingSkillId(skill.id);
+    try {
+      if (
+        skill.source_type === "server" &&
+        skill.server_skill_id &&
+        isServerMode &&
+        isAuthenticated
+      ) {
+        const token = getStoredToken();
+        if (!token) throw new Error("not authenticated");
+        await api.checkServerSkillUpdate(serverApiUrl, token, skill.id, true);
+      } else {
+        await api.checkSkillUpdate(skill.id, true);
+      }
+      await refreshManagedSkills();
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t("common.error")));
+      await refreshManagedSkills();
+    } finally {
+      setCheckingSkillId(null);
+    }
+  };
+
+  const handleRefreshSkill = async (skill: ManagedSkill) => {
+    setUpdatingSkillId(skill.id);
+    try {
+      if (
+        skill.source_type === "server" &&
+        skill.server_skill_id &&
+        isServerMode &&
+        isAuthenticated
+      ) {
+        const token = getStoredToken();
+        if (!token) throw new Error("not authenticated");
+        const result = await api.updateSkillFromServer(serverApiUrl, token, skill.id);
+        if (result.content_changed) {
+          toast.success(t("mySkills.updateActions.updated"));
+        } else {
+          toast.info(t("mySkills.updateActions.alreadyUpToDate"));
+        }
+      } else if (skill.source_type === "local" || skill.source_type === "import") {
+        await api.reimportLocalSkill(skill.id);
+        toast.success(t("mySkills.updateActions.reimported"));
+      } else {
+        const result = await api.updateSkill(skill.id);
+        if (result.content_changed) {
+          toast.success(t("mySkills.updateActions.updated"));
+        } else {
+          toast.info(t("mySkills.updateActions.alreadyUpToDate"));
+        }
+      }
+      await refreshManagedSkills();
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t("common.error")));
+      await refreshManagedSkills();
+    } finally {
+      setUpdatingSkillId(null);
+    }
+  };
+
+  const handleRelinkSource = async (skill: ManagedSkill) => {
+    const selected = await dialogOpen({ directory: true, multiple: false });
+    if (!selected || Array.isArray(selected)) return;
+
+    setUpdatingSkillId(skill.id);
+    try {
+      await api.relinkLocalSkillSource(skill.id, selected);
+      toast.success(t("mySkills.updateActions.relinked"));
+      await refreshManagedSkills();
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t("common.error")));
+      await refreshManagedSkills();
+    } finally {
+      setUpdatingSkillId(null);
+    }
+  };
+
+  const handleDetachSource = async (skill: ManagedSkill) => {
+    setUpdatingSkillId(skill.id);
+    try {
+      await api.detachLocalSkillSource(skill.id);
+      toast.success(t("mySkills.updateActions.detachedSource"));
+      await refreshManagedSkills();
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t("common.error")));
+      await refreshManagedSkills();
+    } finally {
+      setUpdatingSkillId(null);
+    }
+  };
+
+  const handleExportUncategorized = async () => {
+    const rows =
+      categoryFilter === "unset"
+        ? filtered
+            .filter((skill) => isUncategorizedCategory(skill.category))
+            .map((skill) => ({
+              name: skill.name,
+              scope: resolveSkillScope(skill),
+              source: skill.source_type,
+              identifier: skill.central_path,
+              description: skill.description,
+            }))
+        : uncategorizedExportRows;
+    if (rows.length === 0) {
+      toast.info(t("mySkills.exportUncategorizedEmpty"));
+      return;
+    }
+    setExportingCategoryReport(true);
+    try {
+      const filename = `skills-unset-category-local-${rows.length}.csv`;
+      const result = await exportUnsetCategoryReport(rows, filename);
+      if (result === "empty") {
+        toast.info(t("mySkills.exportUncategorizedEmpty"));
+      } else if (result === "clipboard") {
+        toast.success(t("mySkills.exportUncategorizedDone", { count: rows.length }));
+      } else {
+        toast.success(
+          t("mySkills.exportUncategorizedDownloaded", {
+            count: rows.length,
+          })
+        );
+      }
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t("common.error")));
+    } finally {
+      setExportingCategoryReport(false);
+    }
+  };
+
+  const handleAddTag = async (skill: ManagedSkill, inputValue?: string) => {
+    const trimmed = (inputValue ?? tagInput).trim();
+    if (!trimmed || skill.tags.includes(trimmed)) {
+      setTagInput("");
+      return;
+    }
+    try {
+      await api.setSkillTags(skill.id, [...skill.tags, trimmed]);
+      toast.success(t("mySkills.tags.tagAdded"));
+      setTagEditSkillId(null);
+      setTagInput("");
+      await refreshManagedSkills();
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t("common.error")));
+    }
+  };
+
+  const handleRemoveTag = async (skill: ManagedSkill, tagToRemove: string) => {
+    try {
+      await api.setSkillTags(skill.id, skill.tags.filter((t) => t !== tagToRemove));
+      toast.success(t("mySkills.tags.tagsUpdated"));
+      await refreshManagedSkills();
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t("common.error")));
+    }
+  };
+
+  // Replace `oldTag` with `newTag` in the active filter set so the current
+  // filtering survives a rename/delete.
+  const replaceTagInFilters = (oldTag: string, newTag?: string) =>
+    setTagFilters((prev) => {
+      if (!prev.has(oldTag)) return prev;
+      const next = new Set(prev);
+      next.delete(oldTag);
+      if (newTag) next.add(newTag);
+      return next;
+    });
+
+  // Throws on failure so the rename dialog stays open (it only closes after a
+  // resolved onRename), matching how RenamePresetDialog behaves.
+  const handleRenameTag = async (newName: string) => {
+    const oldName = tagToRename;
+    if (oldName === null) return;
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === oldName) return;
+    try {
+      await api.renameTag(oldName, trimmed);
+      replaceTagInFilters(oldName, trimmed);
+      toast.success(t("mySkills.tags.tagRenamed"));
+      await refreshManagedSkills();
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t("common.error")));
+      throw error;
+    }
+  };
+
+  const handleDeleteTag = async () => {
+    const tag = tagToDelete;
+    if (tag === null) return;
+    try {
+      await api.deleteTag(tag);
+      replaceTagInFilters(tag);
+      toast.success(t("mySkills.tags.tagDeleted"));
+      await refreshManagedSkills();
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t("common.error")));
+    }
+  };
+
+  const getTagOptions = (skill: ManagedSkill, keyword: string) => {
+    const needle = keyword.trim().toLowerCase();
+    return allTags.filter((tag) => {
+      if (skill.tags.includes(tag)) return false;
+      if (!needle) return true;
+      return tag.toLowerCase().includes(needle);
+    });
+  };
+
+  const handleSetupClone = async () => {
+    setGitLoading("start");
+    try {
+      await api.gitBackupClone(gitRemoteConfig);
+      toast.success(t("settings.gitCloneSuccess"));
+      await refreshGitStatus();
+    } catch (e) {
+      toast.error(mapGitError(e));
+      throw e;
+    } finally {
+      setGitLoading(null);
+    }
+  };
+
+  const handleSetupInit = async () => {
+    setGitLoading("start");
+    try {
+      await api.gitBackupInit();
+      // If a remote is configured, attach it so the toolbar reflects "needs first push"
+      // rather than "synced", and the next click of Sync can push -u origin <branch>.
+      if (gitRemoteConfig) {
+        try {
+          await api.gitBackupSetRemote(gitRemoteConfig);
+        } catch (remoteErr) {
+          toast.error(mapGitError(remoteErr));
+        }
+      }
+      toast.success(t("settings.gitInitSuccess"));
+      await refreshGitStatus();
+    } catch (e) {
+      toast.error(mapGitError(e));
+      throw e;
+    } finally {
+      setGitLoading(null);
+    }
+  };
+
+  const handleRecoveryReclone = async () => {
+    if (!gitRemoteConfig) {
+      toast.info(t("settings.gitNeedRemoteSetup"));
+      return;
+    }
+    setGitLoading("recovery");
+    try {
+      await api.gitBackupReclone(gitRemoteConfig);
+      toast.success(t("settings.gitRecoveryRecloneSuccess"));
+      await Promise.all([refreshGitStatus(), refreshManagedSkills()]);
+    } catch (e) {
+      toast.error(mapGitError(e));
+      throw e;
+    } finally {
+      setGitLoading(null);
+    }
+  };
+
+  const handleGitSync = async () => {
+    setGitLoading("sync");
+    try {
+      let status = await api.gitBackupStatus();
+      if (!status.is_repo) {
+        toast.info(t("settings.gitNotInitialized"));
+        return;
+      }
+
+      if (!status.remote_url && gitRemoteConfig) {
+        await api.gitBackupSetRemote(gitRemoteConfig);
+        status = await api.gitBackupStatus();
+      }
+
+      if (!status.remote_url) {
+        toast.info(t("settings.gitNeedRemoteSetup"));
+        return;
+      }
+
+      // Pre-flight: surface structural problems that would corrupt or block sync.
+      // `no_upstream` is intentionally NOT treated as fatal here — the backend's
+      // push path retries with `push -u origin <branch>`, which is the correct
+      // behavior for a freshly initialized repo or an empty remote. If that
+      // retry actually fails we'll still route to the recovery dialog via the
+      // post-failure handler below.
+      if (
+        status.upstream_health === "unrelated_histories"
+        || status.upstream_health === "detached"
+      ) {
+        setRecoveryReason(status.upstream_health);
+        setRecoveryOpen(true);
+        return;
+      }
+
+      let committed = false;
+      if (status.has_changes) {
+        await api.gitBackupCommit(t("settings.gitCommitPlaceholder"));
+        committed = true;
+        status = await api.gitBackupStatus();
+      }
+
+      if (status.behind > 0) {
+        await api.gitBackupPull();
+        status = await api.gitBackupStatus();
+        toast.success(t("settings.gitPullSuccess"));
+      }
+
+      // `no_upstream` means the local branch has commits but no remote-tracking
+      // branch yet (fresh init against an empty remote). `ahead` reads 0 in that
+      // state because there is no @{upstream} to diff against, so without this
+      // the first push is silently skipped and the remote stays empty while we
+      // report "Up to date". The backend push path sets upstream via `-u`.
+      const needsPush =
+        committed || status.ahead > 0 || status.upstream_health === "no_upstream";
+      if (needsPush) {
+        const snapshotTag = await api.gitBackupCreateSnapshot();
+        await api.gitBackupPush();
+        toast.success(t("mySkills.gitSyncSuccessWithVersion", { tag: displaySnapshotLabel(snapshotTag) }));
+      } else {
+        toast.success(t("settings.gitUpToDate"));
+      }
+
+      await refreshGitStatus();
+      if (gitVersionsOpen) {
+        await refreshGitVersions();
+      }
+    } catch (e) {
+      // If sync failed because local/remote diverged, route the user into the recovery flow
+      // instead of leaving them with a raw git error.
+      if (isRecoverableSetupError(e)) {
+        toast.error(mapGitError(e));
+        await refreshGitStatus();
+        setRecoveryReason(
+          isSyncConflictError(e) ? "conflict" : (gitStatus?.upstream_health ?? "unrelated_histories")
+        );
+        setRecoveryOpen(true);
+      } else {
+        toast.error(mapGitError(e));
+      }
+    } finally {
+      setGitLoading(null);
+    }
+  };
+
+  const handleRestoreVersion = async () => {
+    if (!restoreVersionTag) return;
+    setRestoringVersionTag(restoreVersionTag);
+    try {
+      await api.gitBackupRestoreVersion(restoreVersionTag);
+      toast.success(t("mySkills.gitVersionRestoreSuccess", { tag: displaySnapshotLabel(restoreVersionTag) }));
+      toast.info(t("mySkills.gitVersionRestoreNeedSync"));
+      await Promise.all([refreshGitStatus(), refreshGitVersions(), refreshManagedSkills()]);
+      setRestoreVersionTag(null);
+    } catch (error: unknown) {
+      toast.error(mapGitError(error));
+    } finally {
+      setRestoringVersionTag(null);
+    }
+  };
+
+  type GitToolbarMode =
+    | "loading"
+    | "uninitialized"
+    | "needs_remote"
+    | "needs_fix"
+    | "up_to_date"
+    | "pending_changes";
+
+  const getGitToolbarMode = (): GitToolbarMode => {
+    if (!gitStatus) return "loading";
+    if (!gitStatus.is_repo) return "uninitialized";
+    if (!gitStatus.remote_url && !gitRemoteConfig) return "needs_remote";
+    if (
+      gitStatus.upstream_health === "unrelated_histories"
+      || gitStatus.upstream_health === "detached"
+    ) {
+      return "needs_fix";
+    }
+    // First-push case: remote is set but upstream tracking is not yet established.
+    // Treat as a normal pending sync — the push path will set upstream automatically.
+    if (gitStatus.upstream_health === "no_upstream") {
+      return "pending_changes";
+    }
+    if (gitStatus.has_changes || gitStatus.ahead > 0 || gitStatus.behind > 0) {
+      return "pending_changes";
+    }
+    return "up_to_date";
+  };
+
+  const formatSnapshotWhen = (tag: string | null) => {
+    if (!tag) return null;
+    const label = displaySnapshotLabel(tag);
+    // Try to format YYYYMMDD-HHMMSS into MM-DD HH:MM
+    const match = label.match(/^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})$/);
+    if (match) {
+      const [, , month, day, hour, min] = match;
+      return `${month}-${day} ${hour}:${min}`;
+    }
+    return label;
+  };
+
+  // Compact inline status: only render when there's actionable info the button alone
+  // does not convey. The button already tells the user "Synced" / "Set Up Backup" /
+  // "Fix Sync Setup", so we suppress redundant labels for those modes.
+  const renderGitInlineStatus = (mode: GitToolbarMode) => {
+    if (!gitStatus || mode === "loading" || mode === "up_to_date") return null;
+    if (mode === "uninitialized" || mode === "needs_remote" || mode === "needs_fix") {
+      return null;
+    }
+    const parts: string[] = [];
+    if (gitStatus.has_changes || gitStatus.ahead > 0) {
+      const localCount = Math.max(gitStatus.ahead, gitStatus.has_changes ? 1 : 0);
+      parts.push(`↑${localCount}`);
+    }
+    if (gitStatus.behind > 0) {
+      parts.push(`↓${gitStatus.behind}`);
+    }
+    if (parts.length === 0 && gitStatus.upstream_health === "no_upstream") {
+      parts.push("↑");
+    }
+    if (parts.length === 0) return null;
+    return (
+      <span
+        className="text-[11px] font-medium text-amber-600 dark:text-amber-400 tabular-nums"
+        title={[
+          gitStatus.has_changes || gitStatus.ahead > 0
+            ? t("mySkills.gitInlineLocalChanges", { count: Math.max(gitStatus.ahead, gitStatus.has_changes ? 1 : 0) })
+            : null,
+          gitStatus.behind > 0 ? t("mySkills.gitInlineRemoteUpdates", { count: gitStatus.behind }) : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+      >
+        {parts.join(" ")}
+      </span>
+    );
+  };
+
+  const sourceIcon = (type: string) => {
+    switch (type) {
+      case "server":
+        return <Cloud className="h-3 w-3" />;
+      case "git":
+      case "skillssh":
+        return <Github className="h-3 w-3" />;
+      case "local":
+      case "import":
+        return <HardDrive className="h-3 w-3" />;
+      default:
+        return <Globe className="h-3 w-3" />;
+    }
+  };
+
+  const canRefresh = useCallback(
+    (skill: ManagedSkill) =>
+      (skill.source_type === "server" &&
+        !!skill.server_skill_id &&
+        isServerMode &&
+        isAuthenticated) ||
+      skill.source_type === "git" ||
+      skill.source_type === "skillssh" ||
+      ((skill.source_type === "local" || skill.source_type === "import") && !!skill.source_ref),
+    [isServerMode, isAuthenticated]
+  );
+
+  const anyRefreshableSelected = useMemo(
+    () => skills.some((skill) => selectedIds.has(skill.id) && canRefresh(skill)),
+    [skills, selectedIds, canRefresh]
+  );
+  const availableUpdateCount = useMemo(
+    () => skills.filter((skill) => skill.update_status === "update_available" && canRefresh(skill)).length,
+    [skills, canRefresh]
+  );
+  const refreshableSelectedCount = useMemo(
+    () => skills.filter((skill) => selectedIds.has(skill.id) && canRefresh(skill)).length,
+    [skills, selectedIds, canRefresh]
+  );
+
+  const sourceTypeLabel = (skill: ManagedSkill) => {
+    switch (skill.source_type) {
+      case "skillssh":
+        return t("mySkills.sourceFilter.skillssh");
+      case "server":
+        return t("mySkills.sourceFilter.server");
+      case "import":
+        return t("mySkills.sourceFilter.import");
+      case "git":
+        return t("mySkills.sourceFilter.git");
+      case "local":
+        return t("mySkills.sourceFilter.local");
+      default:
+        return skill.source_type;
+    }
+  };
+
+  const refreshLabel = (skill: ManagedSkill) => {
+    if (skill.source_type === "server") return t("mySkills.updateActions.syncFromServer");
+    if (skill.source_type === "local" || skill.source_type === "import") {
+      return t("mySkills.updateActions.reimport");
+    }
+    return t("mySkills.updateActions.update");
+  };
+
+  const formatGitDateTime = (iso: string) => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleString();
+  };
+
+  const renderCurrentVersionText = () => {
+    if (!gitStatus?.is_repo) return null;
+    if (gitStatus.current_snapshot_tag) {
+      return t("mySkills.gitCurrentVersionSnapshot", {
+        tag: displaySnapshotLabel(gitStatus.current_snapshot_tag),
+      });
+    }
+    if (gitStatus.restored_from_tag) {
+      return t("mySkills.gitCurrentVersionRestored", {
+        tag: displaySnapshotLabel(gitStatus.restored_from_tag),
+      });
+    }
+    return t("mySkills.gitCurrentVersionUnknown");
+  };
+
+  const statusBadge = (skill: ManagedSkill) => {
+    if (skill.update_status === "update_available") {
+      return {
+        label: "Update",
+        className: "bg-amber-500/12 text-amber-600 dark:text-amber-400",
+      };
+    }
+    if (skill.update_status === "source_missing") {
+      return {
+        label: t("mySkills.updateStatus.sourceMissing"),
+        className: "bg-red-500/10 text-red-600 dark:text-red-300",
+      };
+    }
+    if (skill.update_status === "error") {
+      return {
+        label: t("mySkills.updateStatus.error"),
+        className: "bg-red-500/10 text-red-600 dark:text-red-300",
+      };
+    }
+    return null;
+  };
+
+  const centralStatusBadgeClass = (status: ManagedSkillCentralStatus) => {
+    switch (status) {
+      case "from_central":
+        return "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300";
+      case "uploaded":
+        return "border-sky-500/30 bg-sky-500/10 text-sky-600 dark:text-sky-300";
+      default:
+        return "border-border-subtle bg-background text-muted";
+    }
+  };
+
+  return (
+    <div className="app-page">
+      <div className="app-page-header pr-2 pb-1 flex items-center justify-between gap-3">
+        <h1 className="app-page-title flex items-center gap-2">
+          {t("mySkills.title")}
+          <span className="app-badge">
+            {skills.length}
+          </span>
+        </h1>
+
+      </div>
+
+      <div className="app-toolbar">
+        <div className="flex flex-1 gap-3">
+          <div className="relative w-full max-w-[280px]">
+            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t("mySkills.searchPlaceholder")}
+              className="app-input w-full pl-9 font-medium"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+            />
+          </div>
+
+          <div className="app-segmented">
+            {(["all", "enabled", "available"] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setFilterMode(mode)}
+                className={cn(
+                  "app-segmented-button",
+                  filterMode === mode && "app-segmented-button-active"
+                )}
+              >
+                {t(`mySkills.filters.${mode}`)}
+              </button>
+            ))}
+          </div>
+
+        </div>
+
+        <div className="app-segmented">
+          {(() => {
+            const mode = getGitToolbarMode();
+            const inlineStatus = renderGitInlineStatus(mode);
+            const snapshotWhen = formatSnapshotWhen(gitStatus?.current_snapshot_tag ?? null);
+            return (
+              <>
+                {inlineStatus ? (
+                  <span className="mr-0.5 inline-flex items-center px-1 leading-tight">
+                    {inlineStatus}
+                  </span>
+                ) : null}
+
+                {mode === "uninitialized" || mode === "needs_remote" ? (
+                  <button
+                    onClick={() => setSetupOpen(true)}
+                    disabled={!!gitLoading}
+                    className="inline-flex items-center gap-1 rounded-md px-3 py-2 text-[13px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-secondary disabled:opacity-50"
+                  >
+                    {gitLoading === "start" ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <GitBranch className="h-3.5 w-3.5" />
+                    )}
+                    {gitLoading === "start" ? t("settings.gitInitializing") : t("settings.gitStartBackup")}
+                  </button>
+                ) : mode === "needs_fix" ? (
+                  <button
+                    onClick={() => {
+                      setRecoveryReason(gitStatus?.upstream_health ?? "unrelated_histories");
+                      setRecoveryOpen(true);
+                    }}
+                    disabled={!!gitLoading}
+                    className="inline-flex items-center gap-1 rounded-md px-3 py-2 text-[13px] font-medium text-red-500 transition-colors hover:bg-surface-hover disabled:opacity-50"
+                  >
+                    {gitLoading === "recovery" ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Wrench className="h-3.5 w-3.5" />
+                    )}
+                    {t("mySkills.gitRepoFixSetup")}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleGitSync}
+                    disabled={!!gitLoading || mode === "up_to_date"}
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-md px-3 py-2 text-[13px] font-medium transition-colors hover:bg-surface-hover disabled:opacity-50",
+                      mode === "pending_changes" ? "text-amber-600 dark:text-amber-400" : "text-muted"
+                    )}
+                  >
+                    {gitLoading === "sync" ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : mode === "up_to_date" ? (
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                    ) : (
+                      <ArrowUpCircle className="h-3.5 w-3.5" />
+                    )}
+                    {gitLoading === "sync"
+                      ? t("mySkills.gitRepoSyncing")
+                      : mode === "up_to_date"
+                        ? t("mySkills.gitRepoSynced")
+                        : t("mySkills.gitRepoSync")}
+                  </button>
+                )}
+
+                {gitStatus?.is_repo ? (
+                  <button
+                    onClick={() => setGitVersionsOpen((v) => !v)}
+                    disabled={!!gitLoading}
+                    title={snapshotWhen ? t("mySkills.gitInlineLastSnapshot", { when: snapshotWhen }) : undefined}
+                    className={cn(
+                      "ml-1 inline-flex items-center gap-1 rounded-md px-3 py-2 text-[13px] font-medium transition-colors hover:bg-surface-hover disabled:opacity-50",
+                      gitVersionsOpen ? "text-secondary" : "text-muted"
+                    )}
+                  >
+                    <History className="h-3.5 w-3.5" />
+                    {t("mySkills.gitSnapshots")}
+                  </button>
+                ) : null}
+              </>
+            );
+          })()}
+          <button
+            onClick={handleCheckAllUpdates}
+            disabled={checkingAll}
+            className="ml-2 mr-2 inline-flex items-center gap-1 rounded-md border-l border-border-subtle pl-4 pr-3 py-2 text-[13px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-secondary disabled:opacity-50"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", checkingAll && "animate-spin")} />
+            {t("mySkills.updateActions.checkAll")}
+          </button>
+          <button
+            onClick={handleUpdateAvailableSkills}
+            disabled={batchUpdating || availableUpdateCount === 0}
+            className="mr-2 inline-flex items-center gap-1 rounded-md px-3 py-2 text-[13px] font-medium text-accent-light transition-colors hover:bg-accent-bg disabled:opacity-50"
+          >
+            <RotateCcw className={cn("h-3.5 w-3.5", batchUpdating && "animate-spin")} />
+            {t("mySkills.updateActions.updateAvailable", { count: availableUpdateCount })}
+          </button>
+          <button
+            onClick={() => setViewMode("grid")}
+            className={cn(
+              "rounded-md p-2 transition-colors outline-none",
+              viewMode === "grid" ? "bg-surface-active text-secondary" : "text-muted hover:text-tertiary"
+            )}
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setViewMode("list")}
+            className={cn(
+              "rounded-md p-2 transition-colors outline-none",
+              viewMode === "list" ? "bg-surface-active text-secondary" : "text-muted hover:text-tertiary"
+            )}
+          >
+            <List className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => isMultiSelect ? exitMultiSelect() : setIsMultiSelect(true)}
+            className={cn(
+              "rounded-md p-2 transition-colors outline-none",
+              isMultiSelect ? "bg-surface-active text-secondary" : "text-muted hover:text-tertiary"
+            )}
+            title={isMultiSelect ? t("mySkills.cancelSelect") : t("mySkills.selectMode")}
+          >
+            <SquareCheck className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="-mt-1 mb-1">
+        <div className="flex flex-wrap items-center gap-2 px-1">
+          <button
+            type="button"
+            onClick={() => setAdvancedFiltersOpen((open) => !open)}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-medium transition-colors outline-none",
+              advancedFiltersOpen || advancedFilterCount > 0
+                ? "border-border bg-surface text-secondary"
+                : "border-border-subtle bg-surface-hover text-tertiary hover:text-secondary"
+            )}
+          >
+            <ChevronDown
+              className={cn(
+                "h-3.5 w-3.5 shrink-0 transition-transform",
+                advancedFiltersOpen && "rotate-180"
+              )}
+            />
+            {t("mySkills.advancedFilters")}
+            {advancedFilterCount > 0 ? (
+              <span className="rounded-full bg-accent px-1.5 py-px text-[10px] font-semibold text-white tabular-nums">
+                {advancedFilterCount}
+              </span>
+            ) : null}
+          </button>
+          {advancedFilterCount > 0 ? (
+            <button
+              type="button"
+              onClick={clearAdvancedFilters}
+              className="text-[12px] font-medium text-muted transition-colors hover:text-secondary"
+            >
+              {t("mySkills.clearAdvancedFilters")}
+            </button>
+          ) : null}
+        </div>
+
+        {advancedFiltersOpen ? (
+          <div className="mt-2 space-y-2 rounded-lg border border-border-subtle bg-bg-secondary/80 p-2.5">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="app-filter-label">
+          {t("mySkills.filterRow.scope")}
+        </span>
+        {(["all", "personal", "org", "project"] as const).map((scope) => (
+          <button
+            key={scope}
+            type="button"
+            onClick={() => setScopeFilter(scope)}
+            className={cn(
+              "app-filter-pill",
+              scopeFilter === scope
+                ? "bg-accent text-white dark:bg-accent dark:text-white"
+                : "app-filter-pill-idle"
+            )}
+          >
+            {t(`mySkills.scopeFilter.${scope}`)}
+            <span className="ml-1 tabular-nums opacity-80">({scopeCounts[scope]})</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="app-filter-label">
+          {t("mySkills.filterRow.category")}
+        </span>
+        <button
+          type="button"
+          onClick={() => setCategoryFilter("all")}
+          className={cn(
+            "rounded-full px-2.5 py-0.5 text-[12px] font-medium transition-colors",
+            categoryFilter === "all"
+              ? "bg-accent text-white dark:bg-accent dark:text-white"
+              : "bg-surface-hover text-muted hover:text-secondary"
+          )}
+        >
+          {t("mySkills.categoryFilter.all")}
+          <span className="ml-1 tabular-nums opacity-80">({categoryCounts.all})</span>
+        </button>
+        {uncategorizedCount > 0 ? (
+          <button
+            type="button"
+            onClick={() => setCategoryFilter("unset")}
+            className={cn(
+              "rounded-full px-2.5 py-0.5 text-[12px] font-medium transition-colors",
+              categoryFilter === "unset"
+                ? "bg-amber-600/90 text-white"
+                : "bg-surface-hover text-muted hover:text-secondary"
+            )}
+          >
+            {t("mySkills.categoryFilter.unset")}
+            <span className="ml-1 tabular-nums opacity-80">({uncategorizedCount})</span>
+          </button>
+        ) : null}
+        {SKILL_CATEGORY_IDS.filter((id) => categoryCounts[id] > 0).map((cat) => (
+          <button
+            key={cat}
+            type="button"
+            onClick={() => setCategoryFilter(cat)}
+            className={cn(
+              "rounded-full px-2.5 py-0.5 text-[12px] font-medium transition-colors",
+              categoryFilter === cat
+                ? "bg-accent/90 text-white"
+                : "bg-surface-hover text-muted hover:text-secondary"
+            )}
+          >
+            {skillCategoryLabelKey(cat) ? t(skillCategoryLabelKey(cat)!) : cat}
+            <span className="ml-1 tabular-nums opacity-80">({categoryCounts[cat]})</span>
+          </button>
+        ))}
+        {uncategorizedCount > 0 ? (
+          <button
+            type="button"
+            onClick={() => void handleExportUncategorized()}
+            disabled={exportingCategoryReport}
+            className="ml-auto inline-flex items-center gap-1 rounded-full border border-border-subtle bg-surface px-2.5 py-0.5 text-[12px] font-medium text-muted transition-colors hover:text-secondary disabled:opacity-50"
+            title={t("mySkills.exportUncategorizedHint")}
+          >
+            <FileDown
+              className={cn("h-3 w-3", exportingCategoryReport && "animate-pulse")}
+            />
+            {t("mySkills.exportUncategorized", { count: uncategorizedCount })}
+          </button>
+        ) : null}
+      </div>
+
+      {isServerMode && isAuthenticated ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="app-filter-label">
+            {t("mySkills.filterRow.central")}
+          </span>
+          {(["all", "from_central", "uploaded", "not_uploaded"] as const).map((status) => (
+            <button
+              key={status}
+              type="button"
+              onClick={() => setCentralFilter(status)}
+              className={cn(
+                "rounded-full px-2.5 py-0.5 text-[12px] font-medium transition-colors",
+                centralFilter === status
+                  ? "bg-accent/90 text-white"
+                  : "bg-surface-hover text-muted hover:text-secondary"
+              )}
+            >
+              {t(`mySkills.centralFilter.${status}`)}
+              <span className="ml-1 tabular-nums opacity-80">({centralCounts[status]})</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {showSourceFilterRow ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="app-filter-label">
+            {t("mySkills.filterRow.source")}
+          </span>
+          {sourceFilterOptions.map((src) => (
+            <button
+              key={src}
+              onClick={() => setSourceFilters(toggleFilter(sourceFilters, src))}
+              className={cn(
+                "rounded-full px-2.5 py-0.5 text-[12px] font-medium transition-colors",
+                sourceFilters.has(src)
+                  ? "bg-accent text-white dark:bg-accent dark:text-white"
+                  : "bg-surface-hover text-muted hover:text-secondary"
+              )}
+            >
+              {t(`mySkills.sourceFilter.${src}`)}
+              <span className="ml-1 tabular-nums opacity-80">({sourceCounts[src]})</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {allTags.length > 0 ? (
+        <TagFilterDropdown
+          allTags={allTags}
+          selected={tagFilters}
+          onChange={setTagFilters}
+          showUntagged={skills.some((s) => s.tags.length === 0)}
+          onTagContextMenu={(tag, x, y) => setTagMenu({ tag, x, y })}
+        />
+      ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      {isMultiSelect && (
+        <MultiSelectToolbar
+          selectedCount={selectedIds.size}
+          isAllSelected={isAllSelected}
+          anyDisabled={viewedPreset ? anyDisabled : false}
+          anyUpdatable={anyRefreshableSelected}
+          showToggle={!!viewedPreset}
+          updating={batchUpdating}
+          labels={{
+            hint: t("mySkills.selectHint"),
+            selected: t("mySkills.selectedCount", { count: selectedIds.size }),
+            update: t("mySkills.batchUpdate", { count: refreshableSelectedCount }),
+            delete: t("mySkills.deleteSelected", { count: selectedIds.size }),
+            enable: t("mySkills.batchEnable", { count: selectedIds.size }),
+            disable: t("mySkills.batchDisable", { count: selectedIds.size }),
+            selectAll: t("mySkills.selectAll"),
+            deselectAll: t("mySkills.deselectAll"),
+            cancel: t("common.cancel"),
+            editTags: t("mySkills.batchEditTags", { count: selectedIds.size }),
+            editCategory: t("mySkills.batchEditCategory", { count: selectedIds.size }),
+          }}
+          onUpdate={handleBatchRefresh}
+          onDelete={() => setBatchDeleteConfirm(true)}
+          onToggle={handleBatchTogglePreset}
+          onSelectAll={handleSelectAll}
+          onCancel={exitMultiSelect}
+          onEditTags={() => setBatchTagDialogOpen(true)}
+          onEditCategory={() => setBatchCategoryDialogOpen(true)}
+        />
+      )}
+
+      {gitVersionsOpen && gitStatus?.is_repo && (
+        <div className="app-panel -mt-2 mb-2 p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="min-w-0">
+              <h3 className="text-[13px] font-semibold text-secondary">{t("mySkills.gitVersionHistory")}</h3>
+              <div className="truncate text-[11px] text-faint">{renderCurrentVersionText()}</div>
+            </div>
+            <button
+              onClick={refreshGitVersions}
+              disabled={gitVersionsLoading || !!gitLoading}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[13px] text-muted hover:bg-surface-hover hover:text-secondary disabled:opacity-50"
+            >
+              <RefreshCw className={cn("h-3 w-3", gitVersionsLoading && "animate-spin")} />
+              {t("settings.refresh")}
+            </button>
+          </div>
+          {gitVersionsLoading ? (
+            <div className="py-2 text-[13px] text-muted">{t("mySkills.gitVersionLoading")}</div>
+          ) : gitVersions.length === 0 ? (
+            <div className="py-2 text-[13px] text-muted">{t("mySkills.gitVersionEmpty")}</div>
+          ) : (
+            <div className="max-h-64 space-y-1 overflow-auto pr-1">
+              {gitVersions.map((version) => (
+                <div
+                  key={version.tag}
+                  className="flex items-center justify-between rounded-md border border-border-subtle bg-bg-secondary px-2.5 py-2"
+                >
+                  <div className="min-w-0 pr-3">
+                    <div className="truncate text-[13px] font-medium text-secondary">{displaySnapshotLabel(version.tag)}</div>
+                    <div className="truncate text-[12px] text-muted">
+                      {version.message || version.commit}
+                    </div>
+                    <div className="text-[11px] text-faint">
+                      {version.commit} · {formatGitDateTime(version.committed_at)}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setRestoreVersionTag(version.tag)}
+                    disabled={!!restoringVersionTag}
+                    className="shrink-0 rounded-md border border-border-subtle px-2 py-1 text-[12px] font-medium text-secondary hover:bg-surface-hover disabled:opacity-50"
+                  >
+                    {restoringVersionTag === version.tag
+                      ? t("mySkills.gitVersionRestoring")
+                      : t("mySkills.gitVersionRestore")}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {filtered.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center pb-20 text-center">
+          <Layers className="mb-4 h-12 w-12 text-faint" />
+          <h3 className="mb-1.5 text-[14px] font-semibold text-tertiary">{t("mySkills.noSkills")}</h3>
+          <p className="text-[13px] text-muted">
+            {skills.length === 0 ? t("mySkills.addFirst") : t("mySkills.noMatch")}
+          </p>
+        </div>
+      ) : (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext
+            items={filtered.map((s) => s.id)}
+            strategy={viewMode === "grid" ? rectSortingStrategy : verticalListSortingStrategy}
+          >
+          <div
+            className={cn(
+              "pb-8",
+              viewMode === "grid"
+                ? "grid grid-cols-2 gap-3 lg:grid-cols-3"
+                : "flex flex-col gap-0.5"
+            )}
+          >
+          {filtered.map((skill) => {
+            const enabledInPreset = viewedPreset
+              ? skill.preset_ids.includes(viewedPreset.id)
+              : false;
+            const badge = statusBadge(skill);
+            const isMissingLocalSource =
+              skill.update_status === "source_missing"
+              && (skill.source_type === "local" || skill.source_type === "import");
+            const displayName = skillDisplayNames.get(skill.id) || skill.name;
+            const skillScope = resolveSkillScope(skill);
+            const serverMeta = skill.server_skill_id
+              ? serverSkillById.get(skill.server_skill_id) ?? null
+              : null;
+            const centralStatus = getManagedSkillCentralStatus(skill);
+            const versionLabel = resolveSkillVersionLabel(skill, serverMeta);
+            const showVersionAlways = skillHasDisplayVersion(skill);
+            const hasDescription = Boolean(skill.description?.trim());
+            const scopeLabel = t(`mySkills.scopeFilter.${skillScope}`);
+            const showProjectName =
+              skillScope === "project" && linkedProjectName && isServerMode && isAuthenticated;
+
+            if (viewMode === "grid") {
+              return (
+                <SortableSkillItem
+                  key={skill.id}
+                  id={skill.id}
+                  disabled={!canDrag}
+                  className={tagEditSkillId === skill.id ? "relative z-30" : undefined}
+                >
+                {(dragHandle) => (
+                <div
+                  className={cn(
+                    "app-panel group relative flex h-full cursor-pointer flex-col transition-all hover:border-border hover:bg-surface-hover",
+                    enabledInPreset && "border-l-2 border-l-accent",
+                    isMultiSelect && selectedIds.has(skill.id) && "ring-1 ring-accent border-accent/40"
+                  )}
+                  onClick={() =>
+                    isMultiSelect ? toggleSelect(skill.id) : openSkillDetailById(skill.id)
+                  }
+                >
+                  <div className={cn("absolute right-2 top-2 z-10 flex items-center gap-0.5 rounded-lg border border-border-subtle bg-surface px-1 py-0.5 opacity-0 shadow-sm transition-all", !isMultiSelect && "group-hover:opacity-100")}>
+                    {dragHandle}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleCheckUpdate(skill); }}
+                      disabled={checkingSkillId === skill.id}
+                      className="rounded p-1 text-muted transition-colors hover:bg-surface-hover hover:text-secondary disabled:opacity-50"
+                      title={t("mySkills.updateActions.check")}
+                    >
+                      <RefreshCw className={cn("h-3.5 w-3.5", checkingSkillId === skill.id && "animate-spin")} />
+                    </button>
+                    {canRefresh(skill) ? (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleRefreshSkill(skill); }}
+                        disabled={updatingSkillId === skill.id}
+                        className="rounded p-1 text-accent-light transition-colors hover:bg-accent-bg disabled:opacity-50"
+                        title={refreshLabel(skill)}
+                      >
+                        <RotateCcw className={cn("h-3.5 w-3.5", updatingSkillId === skill.id && "animate-spin")} />
+                      </button>
+                    ) : null}
+                    <DeleteSkillButton
+                      skill={skill}
+                      onConfirm={handleDeleteSkill}
+                      buttonClassName="p-1"
+                    />
+                  </div>
+                  {deletingIds.has(skill.id) && (
+                    <div className="absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-surface/70 backdrop-blur-[1px]">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted" />
+                    </div>
+                  )}
+
+                  <div className="flex items-start gap-2.5 px-3.5 pr-28 pt-3 pb-1">
+                    {isMultiSelect && (
+                      selectedIds.has(skill.id)
+                        ? <SquareCheck className="h-3.5 w-3.5 shrink-0 text-accent mt-2" />
+                        : <Square className="h-3.5 w-3.5 shrink-0 text-faint mt-2" />
+                    )}
+                    <ManagedSkillAvatar
+                      skill={skill}
+                      serverMeta={serverMeta}
+                      baseUrl={serverApiUrl}
+                      token={getStoredToken()}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <h3
+                        className="truncate text-[13px] font-semibold text-primary group-hover:text-accent-light"
+                        title={displayName}
+                      >
+                        {displayName}
+                      </h3>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <span
+                          className={cn(
+                            "shrink-0 rounded-[4px] border px-1.5 py-px text-[11px] font-medium",
+                            serverScopeBadgeClass(skillScope)
+                          )}
+                        >
+                          {scopeLabel}
+                        </span>
+                        {skill.category && skillCategoryLabelKey(skill.category) ? (
+                          <span
+                            className={cn(
+                              "shrink-0 rounded-[4px] border px-1.5 py-px text-[11px] font-medium",
+                              skillCategoryBadgeClass(skill.category)
+                            )}
+                          >
+                            {t(skillCategoryLabelKey(skill.category)!)}
+                          </span>
+                        ) : null}
+                        {isServerMode && isAuthenticated ? (
+                          <span
+                            className={cn(
+                              "shrink-0 rounded-[4px] border px-1.5 py-px text-[11px] font-medium",
+                              centralStatusBadgeClass(centralStatus)
+                            )}
+                          >
+                            {t(`mySkills.centralStatus.${centralStatus}`)}
+                          </span>
+                        ) : null}
+                        {showProjectName ? (
+                          <span
+                            className="shrink-0 max-w-[120px] truncate rounded-[4px] border border-border-subtle bg-background px-1.5 py-px text-[11px] text-tertiary"
+                            title={linkedProjectName ?? undefined}
+                          >
+                            {t("mySkills.projectLinkLabel", { project: linkedProjectName })}
+                          </span>
+                        ) : null}
+                        {versionLabel ? (
+                          <span
+                            className={cn(
+                              "shrink-0 rounded-[4px] border border-border-subtle bg-background px-1.5 py-px font-mono text-[11px] text-tertiary transition-opacity",
+                              showVersionAlways ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                            )}
+                            title={serverMeta?.content_hash ?? skill.content_hash ?? undefined}
+                          >
+                            {t("mySkills.versionLabel", { version: versionLabel })}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="mt-1.5">
+                        {hasDescription ? (
+                          <p className="line-clamp-2 text-[12px] leading-5 text-secondary">
+                            {skill.description!.trim()}
+                          </p>
+                        ) : (
+                          <p className="text-[12px] leading-5 text-muted italic">
+                            {t("mySkills.noDescription")}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="px-3.5 pb-3">
+                    {badge && (
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        <span
+                          className={cn(
+                            "rounded-full px-2 py-0.5 text-[13px] font-medium",
+                            badge.className
+                          )}
+                        >
+                          {badge.label}
+                        </span>
+                        {isMissingLocalSource && (
+                          <>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleRelinkSource(skill); }}
+                              disabled={updatingSkillId === skill.id}
+                              className="rounded-full border border-border-subtle px-2 py-0.5 text-[12px] font-medium text-secondary transition-colors hover:bg-surface-hover disabled:opacity-50"
+                            >
+                              {t("mySkills.updateActions.relink")}
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDetachSource(skill); }}
+                              disabled={updatingSkillId === skill.id}
+                              className="rounded-full border border-border-subtle px-2 py-0.5 text-[12px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-secondary disabled:opacity-50"
+                            >
+                              {t("mySkills.updateActions.detachSource")}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                    <div className="mt-2 flex flex-wrap items-center gap-1">
+                      {skill.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className={cn(
+                            "group/tag inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-medium",
+                            getTagColor(tag, allTags)
+                          )}
+                        >
+                          {tag}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleRemoveTag(skill, tag); }}
+                            className="hidden group-hover/tag:inline-flex rounded-full p-0 opacity-60 hover:opacity-100"
+                          >
+                            <X className="h-2.5 w-2.5" />
+                          </button>
+                        </span>
+                      ))}
+                      {tagEditSkillId === skill.id ? (
+                        <div className="relative" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            ref={tagInputRef}
+                            type="text"
+                            value={tagInput}
+                            onChange={(e) => setTagInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") { handleAddTag(skill); }
+                              if (e.key === "Escape") { setTagEditSkillId(null); setTagInput(""); }
+                            }}
+                            onBlur={() => {
+                              if (tagInput.trim()) handleAddTag(skill);
+                              else { setTagEditSkillId(null); setTagInput(""); }
+                            }}
+                            placeholder={t("mySkills.tags.addTag")}
+                            className="h-5 w-28 rounded-full border border-border-subtle bg-transparent px-1.5 text-[11px] text-secondary outline-none focus:border-accent"
+                            autoCapitalize="none"
+                            autoCorrect="off"
+                            autoComplete="off"
+                            spellCheck={false}
+                            autoFocus
+                          />
+                          {getTagOptions(skill, tagInput).length > 0 && (
+                            <div className="absolute left-0 top-6 z-50 max-h-56 min-w-[112px] max-w-[180px] overflow-y-auto rounded-md border border-border-subtle bg-surface p-1 shadow-lg">
+                              {getTagOptions(skill, tagInput).map((tagOption) => (
+                                <button
+                                  key={tagOption}
+                                  type="button"
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  onClick={(e) => { e.stopPropagation(); handleAddTag(skill, tagOption); }}
+                                  className="w-full truncate rounded px-1.5 py-1 text-left text-[11px] text-secondary hover:bg-surface-hover"
+                                  title={tagOption}
+                                >
+                                  {tagOption}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setTagEditSkillId(skill.id); setTagInput(""); }}
+                          className="inline-flex items-center rounded-full p-0.5 text-faint transition-colors hover:text-muted opacity-0 group-hover:opacity-100"
+                          title={t("mySkills.tags.addTag")}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-auto flex items-center justify-between gap-2 border-t border-border-subtle px-3.5 py-2.5">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <span className="inline-flex shrink-0 items-center gap-1 text-[13px] text-muted">
+                        {sourceIcon(skill.source_type)}
+                        {sourceTypeLabel(skill)}
+                      </span>
+                      {enabledInPreset && (
+                        <>
+                          <span className="text-faint">·</span>
+                          <span className="truncate text-[13px] font-medium text-amber-600 dark:text-amber-400/80">
+                            {viewedPresetName}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <SyncDots
+                        skill={skill}
+                        tools={tools}
+                        limit={6}
+                        onToggle={
+                          isMultiSelect
+                            ? undefined
+                            : (tool, enabled) => handleToggleSkillTarget(skill, tool, enabled)
+                        }
+                        pendingKey={togglingTarget?.skillId === skill.id ? togglingTarget.tool : null}
+                      />
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleTogglePreset(skill); }}
+                        disabled={!viewedPreset}
+                        className={cn(
+                          "rounded px-2 py-1 text-[13px] font-medium transition-colors outline-none",
+                          enabledInPreset
+                            ? "text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
+                            : "text-muted hover:bg-surface-hover hover:text-secondary"
+                        )}
+                      >
+                        {enabledInPreset ? t("mySkills.enabledButton") : t("mySkills.enable")}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                )}
+                </SortableSkillItem>
+              );
+            }
+
+            return (
+              <SortableSkillItem key={skill.id} id={skill.id} disabled={!canDrag}>
+              {(dragHandle) => (
+              <div
+                className={cn(
+                  "app-panel group relative flex cursor-pointer items-center gap-3.5 rounded-xl border-transparent px-3.5 py-3 transition-all hover:border-border hover:bg-surface-hover",
+                  enabledInPreset && "border-l-2 border-l-accent",
+                  isMultiSelect && selectedIds.has(skill.id) && "ring-1 ring-accent border-accent/40"
+                )}
+                onClick={() =>
+                  isMultiSelect ? toggleSelect(skill.id) : openSkillDetailById(skill.id)
+                }
+              >
+                {deletingIds.has(skill.id) && (
+                  <div className="absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-surface/70 backdrop-blur-[1px]">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted" />
+                  </div>
+                )}
+                {dragHandle}
+                {isMultiSelect && (
+                  selectedIds.has(skill.id)
+                    ? <SquareCheck className="h-3.5 w-3.5 shrink-0 text-accent" />
+                    : <Square className="h-3.5 w-3.5 shrink-0 text-faint" />
+                )}
+
+                <ManagedSkillAvatar
+                  skill={skill}
+                  serverMeta={serverMeta}
+                  baseUrl={serverApiUrl}
+                  token={getStoredToken()}
+                  className="h-8 w-8"
+                />
+
+                <div className="w-[160px] shrink-0 min-w-0">
+                  <h3
+                    className="truncate text-[14px] font-semibold text-secondary group-hover:text-primary"
+                    title={displayName}
+                  >
+                    {displayName}
+                  </h3>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                    <span
+                      className={cn(
+                        "rounded-[4px] border px-1 py-px text-[10px] font-medium",
+                        serverScopeBadgeClass(skillScope)
+                      )}
+                    >
+                      {scopeLabel}
+                    </span>
+                    {skill.category && skillCategoryLabelKey(skill.category) ? (
+                      <span
+                        className={cn(
+                          "rounded-[4px] border px-1 py-px text-[10px] font-medium",
+                          skillCategoryBadgeClass(skill.category)
+                        )}
+                      >
+                        {t(skillCategoryLabelKey(skill.category)!)}
+                      </span>
+                    ) : null}
+                    {isServerMode && isAuthenticated ? (
+                      <span
+                        className={cn(
+                          "rounded-[4px] border px-1 py-px text-[10px] font-medium",
+                          centralStatusBadgeClass(centralStatus)
+                        )}
+                      >
+                        {t(`mySkills.centralStatus.${centralStatus}`)}
+                      </span>
+                    ) : null}
+                    {versionLabel ? (
+                      <span
+                        className={cn(
+                          "font-mono text-[10px] text-muted transition-opacity",
+                          showVersionAlways ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                        )}
+                        title={serverMeta?.content_hash ?? skill.content_hash ?? undefined}
+                      >
+                        {t("mySkills.versionLabel", { version: versionLabel })}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+
+                <p className="min-w-0 flex-1 truncate text-[13px] text-muted">
+                  {hasDescription ? skill.description!.trim() : t("mySkills.noDescriptionShort")}
+                </p>
+
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {skill.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className={cn(
+                        "inline-flex items-center rounded-full px-1.5 py-0.5 text-[11px] font-medium",
+                        getTagColor(tag, allTags)
+                      )}
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="flex shrink-0 items-center gap-2.5">
+                  {badge && (
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[12px] font-medium",
+                        badge.className
+                      )}
+                    >
+                      {badge.label}
+                    </span>
+                  )}
+                  <SyncDots
+                    skill={skill}
+                    tools={tools}
+                    limit={6}
+                    size="sm"
+                    onToggle={
+                      isMultiSelect
+                        ? undefined
+                        : (tool, enabled) => handleToggleSkillTarget(skill, tool, enabled)
+                    }
+                    pendingKey={togglingTarget?.skillId === skill.id ? togglingTarget.tool : null}
+                  />
+                  <span className="inline-flex items-center gap-1 text-[13px] text-muted">
+                    {sourceIcon(skill.source_type)}
+                    {sourceTypeLabel(skill)}
+                  </span>
+                  {enabledInPreset && (
+                    <span className="text-[13px] font-medium text-amber-600 dark:text-amber-400/80">
+                      {viewedPresetName}
+                    </span>
+                  )}
+                </div>
+
+                <div className={cn("flex shrink-0 items-center gap-1 opacity-0 transition-opacity", !isMultiSelect && "group-hover:opacity-100")}>
+                  {isMissingLocalSource && (
+                    <>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleRelinkSource(skill); }}
+                        disabled={updatingSkillId === skill.id}
+                        className="rounded px-2 py-0.5 text-[13px] font-medium text-secondary transition-colors hover:bg-surface-hover disabled:opacity-50"
+                      >
+                        {t("mySkills.updateActions.relink")}
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDetachSource(skill); }}
+                        disabled={updatingSkillId === skill.id}
+                        className="rounded px-2 py-0.5 text-[13px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-secondary disabled:opacity-50"
+                      >
+                        {t("mySkills.updateActions.detachSource")}
+                      </button>
+                    </>
+                  )}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleTogglePreset(skill); }}
+                    disabled={!viewedPreset}
+                    className={cn(
+                      "rounded px-2 py-0.5 text-[13px] font-medium transition-colors outline-none",
+                      enabledInPreset
+                        ? "text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
+                        : "text-muted hover:bg-surface-hover hover:text-secondary"
+                    )}
+                  >
+                    {enabledInPreset ? t("mySkills.enabledButton") : t("mySkills.enable")}
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleCheckUpdate(skill); }}
+                    disabled={checkingSkillId === skill.id}
+                    className="rounded p-0.5 text-muted transition-colors hover:bg-surface-hover hover:text-secondary disabled:opacity-50"
+                    title={t("mySkills.updateActions.check")}
+                  >
+                    <RefreshCw className={cn("h-3.5 w-3.5", checkingSkillId === skill.id && "animate-spin")} />
+                  </button>
+                  {canRefresh(skill) ? (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleRefreshSkill(skill); }}
+                      disabled={updatingSkillId === skill.id}
+                      className="rounded p-0.5 text-accent-light transition-colors hover:bg-accent-bg disabled:opacity-50"
+                      title={refreshLabel(skill)}
+                    >
+                      <RotateCcw className={cn("h-3.5 w-3.5", updatingSkillId === skill.id && "animate-spin")} />
+                    </button>
+                  ) : null}
+                  <DeleteSkillButton
+                    skill={skill}
+                    onConfirm={handleDeleteSkill}
+                    buttonClassName="p-0.5"
+                  />
+                </div>
+              </div>
+              )}
+              </SortableSkillItem>
+            );
+          })}
+        </div>
+          </SortableContext>
+        </DndContext>
+      )}
+
+      <ConfirmDialog
+        open={batchDeleteConfirm}
+        message={t("mySkills.batchDeleteConfirm", { count: selectedIds.size })}
+        onClose={() => setBatchDeleteConfirm(false)}
+        onConfirm={handleBatchDelete}
+      />
+      <ConfirmDialog
+        open={tagToDelete !== null}
+        title={t("mySkills.tags.deleteTag")}
+        message={t("mySkills.tags.deleteConfirm", { tag: tagToDelete || "" })}
+        onClose={() => setTagToDelete(null)}
+        onConfirm={handleDeleteTag}
+      />
+      <TagRenameDialog
+        open={tagToRename !== null}
+        currentName={tagToRename || ""}
+        onClose={() => setTagToRename(null)}
+        onRename={handleRenameTag}
+      />
+      {tagMenu && (
+        <>
+          {/* Backdrop closes on left- or right-click outside the menu. Explicit
+              z-index (z-40/z-50) to avoid the macOS WKWebView stacking bug. */}
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setTagMenu(null)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setTagMenu(null);
+            }}
+          />
+          <div
+            className="fixed z-50 min-w-[140px] overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-2xl"
+            style={{ top: tagMenu.y, left: tagMenu.x }}
+          >
+            <button
+              onClick={() => {
+                setTagToRename(tagMenu.tag);
+                setTagMenu(null);
+              }}
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] text-secondary hover:bg-surface-hover"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              {t("mySkills.tags.renameTag")}
+            </button>
+            <button
+              onClick={() => {
+                setTagToDelete(tagMenu.tag);
+                setTagMenu(null);
+              }}
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] text-red-400 hover:bg-surface-hover"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              {t("mySkills.tags.deleteTag")}
+            </button>
+          </div>
+        </>
+      )}
+      <BatchTagDialog
+        open={batchTagDialogOpen}
+        skills={skills.filter((s) => selectedIds.has(s.id))}
+        allTags={allTags}
+        onClose={() => setBatchTagDialogOpen(false)}
+        onApply={handleBatchEditTags}
+      />
+      <BatchCategoryDialog
+        open={batchCategoryDialogOpen}
+        skillCount={selectedIds.size}
+        loading={batchCategorySaving}
+        onClose={() => setBatchCategoryDialogOpen(false)}
+        onApply={handleBatchSetCategory}
+      />
+      <ConfirmDialog
+        open={restoreVersionTag !== null}
+        title={t("mySkills.gitVersionRestoreTitle")}
+        message={t("mySkills.gitVersionRestoreConfirm", { tag: displaySnapshotLabel(restoreVersionTag || "") })}
+        tone="warning"
+        confirmLabel={t("mySkills.gitVersionRestore")}
+        onClose={() => setRestoreVersionTag(null)}
+        onConfirm={handleRestoreVersion}
+      />
+      <GitSetupDialog
+        open={setupOpen}
+        hasRemote={!!gitRemoteConfig}
+        onClose={() => setSetupOpen(false)}
+        onClone={handleSetupClone}
+        onInit={handleSetupInit}
+      />
+      <GitRecoveryDialog
+        open={recoveryOpen}
+        reason={recoveryReason}
+        onClose={() => setRecoveryOpen(false)}
+        onReclone={handleRecoveryReclone}
+      />
+    </div>
+  );
+}

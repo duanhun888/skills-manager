@@ -1,0 +1,29 @@
+# 业务仓库根目录 — 复制为 .gitlab-ci.yml 并按注释修改
+#
+# 前置条件:
+#   1. 中央仓库已上传 org-code-review（examples/skills/org-code-review）
+#   2. GitLab Group 变量已配置（见 examples/gitlab/README.md）
+#   3. 已部署 Review Service（examples/review-service/review_gate.py）
+#   4. 保护分支开启 Required pipeline: skills-review-merge
+
+stages:
+  - review
+  - build
+
+variables:
+  SKILLS_REVIEW_SKILL_NAME: "org-code-review"
+  # 强烈建议 pin 中央 Skill 版本，更新审查规则时主动改此 hash
+  # SKILLS_REVIEW_SKILL_HASH: "abc123..."
+
+include:
+  - local: 'examples/gitlab/skills-review.yml'
+  # 若脚本放在 ci-templates 项目，改为:
+  # - project: 'your-group/ci-templates'
+  #   ref: main
+  #   file: '/skills-review.yml'
+
+# 你的正常构建 job（示例）
+# build:
+#   stage: build
+#   script:
+#     - npm ci && npm run build
