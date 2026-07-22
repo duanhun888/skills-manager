@@ -18,6 +18,7 @@ import {
   FileDown,
   User,
   History,
+  FolderOpen,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -29,6 +30,7 @@ import { useOpenSkillDetail } from "../../hooks/useOpenSkillDetail";
 import { StatusBanner } from "../../components/StatusBanner";
 import { MultiSelectToolbar } from "../../components/MultiSelectToolbar";
 import { BatchCategoryDialog } from "../../components/BatchCategoryDialog";
+import { InstallToProjectDialog } from "../../components/InstallToProjectDialog";
 import { useMultiSelect } from "../../hooks/useMultiSelect";
 import { getErrorMessage } from "../../lib/error";
 import { useAuth } from "../../context/useAuth";
@@ -94,11 +96,13 @@ function shortenGitRemote(remote: string): string {
 
 export function ServerInstallTab() {
   const { t } = useTranslation();
-  const { refreshPresets, refreshManagedSkills, managedSkills } = useApp();
+  const { refreshPresets, refreshManagedSkills, refreshProjects, managedSkills, projects } = useApp();
   const navigate = useNavigate();
   const openSkillDetail = useOpenSkillDetail();
   const { isServerMode, isAuthenticated, serverApiUrl, user } = useAuth();
   const [installing, setInstalling] = useState<string | null>(null);
+  const [installToProjectSkill, setInstallToProjectSkill] = useState<ServerSkill | null>(null);
+  const [installToProjectSubmitting, setInstallToProjectSubmitting] = useState(false);
   const [serverScope, setServerScope] = useState<"" | "org" | "project" | "personal">("");
   const [serverCategoryFilter, setServerCategoryFilter] = useState<"all" | "unset" | SkillCategoryId>("all");
   const [serverSearch, setServerSearch] = useState("");
@@ -446,6 +450,39 @@ export function ServerInstallTab() {
     }
   };
 
+  const ensureLocalSkillId = async (skill: ServerSkill): Promise<string> => {
+    const existing = managedSkills.find((s) => s.server_skill_id === skill.id);
+    if (existing) return existing.id;
+
+    const token = getStoredToken();
+    if (!token) {
+      throw new Error(t("install.server.loginRequired"));
+    }
+    if (skill.status === "disabled") {
+      throw new Error(t("install.server.disabledHint"));
+    }
+    if (!skill.has_content && !skill.git_remote) {
+      throw new Error(t("install.server.noContent"));
+    }
+
+    try {
+      const result = await api.installFromServer(serverApiUrl, token, skill.id);
+      await Promise.all([refreshPresets(), refreshManagedSkills()]);
+      return result.skill_id;
+    } catch (error: unknown) {
+      const message = getErrorMessage(error, t("common.error"));
+      if (message.includes("already_installed")) {
+        await refreshManagedSkills();
+        const after = (await api.getManagedSkills()).find((s) => s.server_skill_id === skill.id);
+        if (after) return after.id;
+      }
+      if (message.includes("no_server_content")) {
+        throw new Error(t("install.server.noContent"));
+      }
+      throw error instanceof Error ? error : new Error(message);
+    }
+  };
+
   const handleInstallServer = async (skill: ServerSkill) => {
     const token = getStoredToken();
     if (!token) {
@@ -488,6 +525,45 @@ export function ServerInstallTab() {
       }
     } finally {
       setInstalling(null);
+    }
+  };
+
+  const handleInstallToProject = async (projectId: string, agents: string[]) => {
+    const skill = installToProjectSkill;
+    if (!skill) return;
+
+    setInstallToProjectSubmitting(true);
+    const toastId = toast.loading(
+      t("install.server.installToProjectWorkingToast", { name: skill.name })
+    );
+    try {
+      const localSkillId = await ensureLocalSkillId(skill);
+      await api.exportSkillToProject(localSkillId, projectId, agents);
+      await refreshProjects();
+      const project = projects.find((p) => p.id === projectId);
+      toast.success(
+        t("install.server.installToProjectSuccess", {
+          name: skill.name,
+          project: project?.name ?? projectId,
+        }),
+        {
+          id: toastId,
+          action: {
+            label: t("install.server.installToProjectOpen"),
+            onClick: () => navigate(`/project/${projectId}`),
+          },
+        }
+      );
+      setInstallToProjectSkill(null);
+    } catch (error: unknown) {
+      const message = getErrorMessage(error, t("common.error"));
+      if (message.toLowerCase().includes("already exists")) {
+        toast.error(t("install.server.installToProjectAlreadyExists"), { id: toastId });
+      } else {
+        toast.error(message, { id: toastId });
+      }
+    } finally {
+      setInstallToProjectSubmitting(false);
     }
   };
 
@@ -1014,25 +1090,41 @@ export function ServerInstallTab() {
                             <span className="text-[12px] text-amber-500">
                               {t("install.server.disabledHint")}
                             </span>
-                          ) : isInstalled ? (
-                            <span className="inline-flex items-center gap-1 text-[12px] text-emerald-500">
-                              <Check className="h-3.5 w-3.5" />
-                              {t("install.installed")}
-                            </span>
                           ) : (
-                            <button
-                              type="button"
-                              onClick={() => void handleInstallServer(skill)}
-                              disabled={!canInstall || isInstalling}
-                              className="app-button-primary text-[12px]"
-                            >
-                              {isInstalling ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            <div className="flex flex-wrap items-center justify-end gap-1.5">
+                              {(skill.has_content || !!skill.git_remote) ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setInstallToProjectSkill(skill)}
+                                  disabled={isInstalling || installToProjectSubmitting}
+                                  className="inline-flex items-center gap-1 rounded-[5px] border border-border-subtle px-2 py-1 text-[11px] text-secondary hover:bg-surface-hover disabled:opacity-50"
+                                  title={t("install.server.installToProject")}
+                                >
+                                  <FolderOpen className="h-3 w-3" />
+                                  {t("install.server.installToProject")}
+                                </button>
+                              ) : null}
+                              {isInstalled ? (
+                                <span className="inline-flex items-center gap-1 text-[12px] text-emerald-500">
+                                  <Check className="h-3.5 w-3.5" />
+                                  {t("install.installed")}
+                                </span>
                               ) : (
-                                <DownloadCloud className="h-3.5 w-3.5" />
+                                <button
+                                  type="button"
+                                  onClick={() => void handleInstallServer(skill)}
+                                  disabled={!canInstall || isInstalling}
+                                  className="app-button-primary text-[12px]"
+                                >
+                                  {isInstalling ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <DownloadCloud className="h-3.5 w-3.5" />
+                                  )}
+                                  {isInstalling ? t("install.installing") : t("install.oneClickInstall")}
+                                </button>
                               )}
-                              {isInstalling ? t("install.installing") : t("install.oneClickInstall")}
-                            </button>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -1043,6 +1135,17 @@ export function ServerInstallTab() {
             </>
           )}
         </div>
+
+      <InstallToProjectDialog
+        open={installToProjectSkill !== null}
+        skillName={installToProjectSkill?.name ?? ""}
+        projects={projects}
+        submitting={installToProjectSubmitting}
+        onClose={() => {
+          if (!installToProjectSubmitting) setInstallToProjectSkill(null);
+        }}
+        onConfirm={handleInstallToProject}
+      />
 
       <BatchCategoryDialog
         open={serverBatchCategoryDialogOpen}

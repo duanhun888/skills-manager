@@ -596,7 +596,22 @@
       "personalOwner": "属主 {{owner}}",
       "projectOwner": "项目 {{project}}",
       "createdBy": "创建 {{creator}}",
-      "recentUpdates": "最近更新 {{users}}"
+      "recentUpdates": "最近更新 {{users}}",
+      "installToProject": "安装到项目",
+      "installToProjectTitle": "安装到项目",
+      "installToProjectSubtitle": "将「{{name}}」下载到所选项目目录",
+      "installToProjectPick": "选择项目",
+      "installToProjectAgents": "目标 Agent",
+      "installToProjectEmpty": "还没有关联项目",
+      "installToProjectEmptyHint": "先在工作台关联代码仓库，再安装到项目目录。",
+      "installToProjectGoDashboard": "去工作台",
+      "installToProjectNoAgents": "该项目没有可用的 Agent，请先在设置中启用。",
+      "installToProjectConfirm": "安装到此项目",
+      "installToProjectWorking": "正在安装…",
+      "installToProjectWorkingToast": "正在将 {{name}} 安装到项目…",
+      "installToProjectSuccess": "「{{name}}」已安装到「{{project}}」",
+      "installToProjectOpen": "打开项目",
+      "installToProjectAlreadyExists": "该项目目录里已有同名 Skill，请先移除或改名后再试"
     },
     "cancel": "取消",
     "toast": {

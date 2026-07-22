@@ -547,7 +547,22 @@
       "personalOwner": "屬主 {{owner}}",
       "projectOwner": "專案 {{project}}",
       "createdBy": "建立 {{creator}}",
-      "recentUpdates": "最近更新 {{users}}"
+      "recentUpdates": "最近更新 {{users}}",
+      "installToProject": "安裝到專案",
+      "installToProjectTitle": "安裝到專案",
+      "installToProjectSubtitle": "將「{{name}}」下載到所選專案目錄",
+      "installToProjectPick": "選擇專案",
+      "installToProjectAgents": "目標 Agent",
+      "installToProjectEmpty": "還沒有關聯專案",
+      "installToProjectEmptyHint": "先在工作台關聯程式碼倉庫，再安裝到專案目錄。",
+      "installToProjectGoDashboard": "去工作台",
+      "installToProjectNoAgents": "該專案沒有可用的 Agent，請先在設定中啟用。",
+      "installToProjectConfirm": "安裝到此專案",
+      "installToProjectWorking": "正在安裝…",
+      "installToProjectWorkingToast": "正在將 {{name}} 安裝到專案…",
+      "installToProjectSuccess": "「{{name}}」已安裝到「{{project}}」",
+      "installToProjectOpen": "開啟專案",
+      "installToProjectAlreadyExists": "該專案目錄裡已有同名 Skill，請先移除或改名後再試"
     },
     "cancel": "取消",
     "toast": {

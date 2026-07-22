@@ -591,7 +591,22 @@
       "personalOwner": "Owner {{owner}}",
       "projectOwner": "Project {{project}}",
       "createdBy": "Created by {{creator}}",
-      "recentUpdates": "Recent updates {{users}}"
+      "recentUpdates": "Recent updates {{users}}",
+      "installToProject": "Install to project",
+      "installToProjectTitle": "Install to project",
+      "installToProjectSubtitle": "Download \"{{name}}\" into the selected project folder",
+      "installToProjectPick": "Choose a project",
+      "installToProjectAgents": "Target agents",
+      "installToProjectEmpty": "No linked projects yet",
+      "installToProjectEmptyHint": "Link a repository from the dashboard first, then install into that project.",
+      "installToProjectGoDashboard": "Go to dashboard",
+      "installToProjectNoAgents": "No enabled agents for this project. Enable one in Settings.",
+      "installToProjectConfirm": "Install to project",
+      "installToProjectWorking": "Installing…",
+      "installToProjectWorkingToast": "Installing {{name}} into the project…",
+      "installToProjectSuccess": "\"{{name}}\" installed to \"{{project}}\"",
+      "installToProjectOpen": "Open project",
+      "installToProjectAlreadyExists": "A skill with the same name already exists in this project. Remove or rename it, then try again."
     },
     "cancel": "Cancel",
     "toast": {
