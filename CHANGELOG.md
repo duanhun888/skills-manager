@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.0] - 2026-07-22
+
+### Release Overview
+- 
+
+### User-facing
+- 
+
+### Developer & Governance
+- 
 ## [1.0.0] - 2026-07-14
 
 - Initial public release of 芯宏 Skills 仓库
