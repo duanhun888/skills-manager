@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "芯宏Skills仓库",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "identifier": "com.xinhong.skills",
   "build": {
     "frontendDist": "../dist",
@@ -45,6 +45,11 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/icon.ico"
+      }
+    },
     "macOS": {
       "minimumSystemVersion": "10.15"
     }

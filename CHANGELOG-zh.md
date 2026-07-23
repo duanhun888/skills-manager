@@ -1,5 +1,16 @@
 # 更新日志
 
+## [1.1.1] - 2026-07-23
+
+### 发布概览
+- 修复 Windows 安装包（setup.exe）未显示应用图标的问题
+
+### 用户可见更新
+- Windows NSIS 安装包使用项目品牌图标（鸟标）
+
+### 开发者与治理更新
+- `tauri.conf.json` 增加 `bundle.windows.nsis.installerIcon`
+
 ## [1.1.0] - 2026-07-22
 
 ### 发布概览
