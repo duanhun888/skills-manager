@@ -1,4 +1,4 @@
-# Joint build: fetch OpenCode Desktop + build Skills (NSIS embeds OpenCode)
+# Joint build: build 芯宏定制 OpenCode Desktop (DEV) from opencode/ + Skills NSIS
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\joint-build.ps1 -SkipElevate
 #   powershell -ExecutionPolicy Bypass -File .\scripts\joint-build.ps1 -SkipElevate -SkipOpenCode
@@ -32,13 +32,13 @@ New-Item -ItemType Directory -Force -Path $Staging | Out-Null
 Set-Content -Path (Join-Path $Staging "OPENCODE_VERSION") -Value $OpenCodeVersion
 
 if (-not $SkipOpenCode -and -not $SkipFetch) {
-    Log "START: fetch OpenCode Desktop installer"
-    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "fetch-opencode-desktop.ps1")
-    if ($LASTEXITCODE -ne 0) { throw "fetch-opencode-desktop failed" }
+    Log "START: build OpenCode Desktop from vendored opencode/ (DEV channel)"
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "build-opencode-desktop.ps1")
+    if ($LASTEXITCODE -ne 0) { throw "build-opencode-desktop failed" }
     $exe = Join-Path $Root "src-tauri\resources\opencode\opencode-desktop-win-x64.exe"
-    if (-not (Test-Path $exe)) { throw "Missing $exe after fetch" }
+    if (-not (Test-Path $exe)) { throw "Missing $exe after build" }
     Copy-Item $exe (Join-Path $Staging "opencode-desktop-win-x64.exe") -Force
-    Log "OK: OpenCode installer staged"
+    Log "OK: OpenCode DEV installer staged"
 }
 
 if (-not $SkipSkills) {
@@ -55,5 +55,5 @@ if (-not $SkipSkills) {
 
 Log "DONE: joint-build"
 Write-Host ""
-Write-Host "Installer: release\*-setup.exe (NSIS post-install asks to install OpenCode)" -ForegroundColor Green
+Write-Host "Installer: release\*-setup.exe (NSIS post-install asks to install OpenCode Dev / 需求工作台)" -ForegroundColor Green
 Write-Host "Or Settings → OpenCode 编辑器 → 安装捆绑的 OpenCode" -ForegroundColor Cyan

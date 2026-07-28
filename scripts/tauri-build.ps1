@@ -106,13 +106,13 @@ try {
     Log "npm ci + tauri build (~15-25 min, output in log)"
     Write-Host "Building... (see $logFile for full output)" -ForegroundColor Cyan
     Run-Cmd "npm ci" "npm ci"
-    # Bundle OpenCode Desktop into NSIS resources when network allows
-    $fetchOc = Join-Path $sourceRepo "scripts\fetch-opencode-desktop.ps1"
-    if (Test-Path $fetchOc) {
-        Log "fetch OpenCode Desktop (optional for NSIS bundle)"
-        cmd /c "powershell -NoProfile -ExecutionPolicy Bypass -File `"$fetchOc`" >> `"$logFile`" 2>&1"
+    # Bundle 芯宏定制 OpenCode Desktop (built from opencode/) into NSIS resources
+    $buildOc = Join-Path $sourceRepo "scripts\build-opencode-desktop.ps1"
+    if (Test-Path $buildOc) {
+        Log "build OpenCode Desktop from opencode/ (optional for NSIS bundle)"
+        cmd /c "powershell -NoProfile -ExecutionPolicy Bypass -File `"$buildOc`" >> `"$logFile`" 2>&1"
         if ($LASTEXITCODE -ne 0) {
-            Log "WARN: OpenCode fetch failed — Skills installer will build without bundled editor"
+            Log "WARN: OpenCode source build failed — Skills installer will build without bundled editor"
         }
     }
     Run-Cmd "tauri build" "npm run tauri:build -- --bundles nsis"

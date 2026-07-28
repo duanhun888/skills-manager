@@ -1,5 +1,6 @@
-Bundled OpenCode Desktop goes here at build time.
-
-Run: powershell -ExecutionPolicy Bypass -File .\scripts\fetch-opencode-desktop.ps1
-
-The .exe is gitignored; CI / joint-build fetches the pinned version from OPENCODE_VERSION.
+﻿Bundled OpenCode Desktop = 鑺畯瀹氬埗婧愮爜鏋勫缓 (not anomalyco GitHub release).
+Source: opencode/ in this repo (requirements workbench / DEV channel).
+Pin: 1.18.4
+Channel: dev
+Arch: win-x64
+Built by scripts/build-opencode-desktop.ps1 (do not commit the .exe).

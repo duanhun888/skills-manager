@@ -1,5 +1,19 @@
 # 更新日志
 
+## [1.3.0] - 2026-07-28
+
+### 发布概览
+- Windows 捆绑编辑器改为**本仓库定制 OpenCode Dev（需求工作台）**，不再下载 anomalyco 官方安装包
+
+### 用户可见更新
+- 安装结束询问「是否安装 OpenCode Dev（需求工作台）」
+- 设置页文案标明为定制 DEV，与本地需求工作台一致
+
+### 开发者与治理更新
+- 新增 `scripts/build-opencode-desktop.ps1`：从 `opencode/` 以 `OPENCODE_CHANNEL=dev` 构建并 stage
+- CI Windows：安装 Bun 后源码构建，替代 GitHub Releases fetch
+- `VENDOR.md` / NSIS / 启动探测路径对齐 OpenCode Dev
+
 ## [1.2.2] - 2026-07-28
 
 ### 发布概览

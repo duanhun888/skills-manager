@@ -86,7 +86,13 @@ fn find_desktop_exe() -> Option<PathBuf> {
     let mut candidates: Vec<PathBuf> = Vec::new();
 
     if let Some(local) = dirs::data_local_dir() {
-        // electron-builder default-ish locations
+        // electron-builder default-ish locations (prod + DEV channel)
+        candidates.push(
+            local
+                .join("Programs")
+                .join("OpenCode Dev")
+                .join("OpenCode Dev.exe"),
+        );
         candidates.push(local.join("Programs").join("OpenCode").join("OpenCode.exe"));
         candidates.push(local.join("Programs").join("opencode").join("OpenCode.exe"));
         candidates.push(
@@ -95,8 +101,21 @@ fn find_desktop_exe() -> Option<PathBuf> {
                 .join("opencode-desktop")
                 .join("OpenCode.exe"),
         );
+        candidates.push(
+            local
+                .join("Programs")
+                .join("opencode-dev")
+                .join("OpenCode Dev.exe"),
+        );
     }
     if let Some(home) = dirs::home_dir() {
+        candidates.push(
+            home.join("AppData")
+                .join("Local")
+                .join("Programs")
+                .join("OpenCode Dev")
+                .join("OpenCode Dev.exe"),
+        );
         candidates.push(
             home.join("AppData")
                 .join("Local")
@@ -105,7 +124,14 @@ fn find_desktop_exe() -> Option<PathBuf> {
                 .join("OpenCode.exe"),
         );
         // Scoop shims / installs
-        candidates.push(home.join("scoop").join("apps").join("opencode-desktop").join("current").join("OpenCode.exe"));
+        candidates.push(
+            home
+                .join("scoop")
+                .join("apps")
+                .join("opencode-desktop")
+                .join("current")
+                .join("OpenCode.exe"),
+        );
     }
 
     // Custom override from settings file path env (optional)
@@ -162,7 +188,7 @@ pub async fn install_bundled_opencode(app: AppHandle) -> Result<(), AppError> {
     tauri::async_runtime::spawn_blocking(move || {
         let installer = bundled_installer_path(&app).ok_or_else(|| {
             AppError::not_found(
-                "Bundled OpenCode installer not found. Rebuild with scripts/fetch-opencode-desktop.ps1",
+                "Bundled OpenCode installer not found. Rebuild with scripts/build-opencode-desktop.ps1",
             )
         })?;
         spawn_detached(&installer, &[])?;

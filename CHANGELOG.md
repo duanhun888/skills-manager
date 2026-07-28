@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.3.0] - 2026-07-28
+
+### Release Overview
+- Windows bundled editor is now **this repo’s customized OpenCode Dev** (requirements workbench), not the anomalyco GitHub release
+
+### User-facing
+- NSIS asks to install OpenCode Dev (requirements workbench)
+- Settings copy clarifies the custom DEV build
+
+### Developer & Governance
+- `scripts/build-opencode-desktop.ps1` builds from vendored `opencode/` with `OPENCODE_CHANNEL=dev`
+- CI Windows: Bun + source build instead of fetching official releases
+- VENDOR.md / NSIS / desktop launch paths aligned with OpenCode Dev
+
 ## [1.2.2] - 2026-07-28
 
 ### Release Overview
