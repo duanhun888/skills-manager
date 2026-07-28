@@ -72,6 +72,12 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Fetch bundled OpenCode Desktop (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\fetch-opencode-desktop.ps1
+
       - name: Windows smoke check
         if: matrix.platform == 'windows-latest'
         run: cargo check --manifest-path src-tauri/Cargo.toml

@@ -34,13 +34,23 @@ $readmeText = [System.IO.File]::ReadAllText($readmeSrc, (New-Object System.Text.
 $gbk = [System.Text.Encoding]::GetEncoding(936)
 [System.IO.File]::WriteAllText($readmePath, $readmeText, $gbk)
 
+# Include bundled OpenCode installer when present (from fetch-opencode-desktop.ps1)
+$ocExe = Join-Path $sourceRepo "src-tauri\resources\opencode\opencode-desktop-win-x64.exe"
+$zipItems = @($outExe, $readmePath)
+if (Test-Path $ocExe) {
+    $ocOutDir = Join-Path $outDir "opencode"
+    New-Item -ItemType Directory -Force -Path $ocOutDir | Out-Null
+    Copy-Item $ocExe $ocOutDir -Force
+    $zipItems += (Join-Path $ocOutDir "opencode-desktop-win-x64.exe")
+}
+
 # Remove legacy Chinese-named readme if present
 $legacyReadme = Join-Path $outDir "使用说明.txt"
 if (Test-Path $legacyReadme) { Remove-Item $legacyReadme -Force }
 
 $zipPath = Join-Path $outDir "skills-manager-portable.zip"
 if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
-Compress-Archive -Path $outExe, $readmePath -DestinationPath $zipPath -Force
+Compress-Archive -Path $zipItems -DestinationPath $zipPath -Force
 
 Write-Host ""
 Write-Host "Done. Send this zip to colleagues:" -ForegroundColor Green

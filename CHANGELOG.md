@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.1] - 2026-07-28
+
+### Release Overview
+- Windows installer can bundle OpenCode Desktop: optional post-install and Settings install/open
+
+### User-facing
+- NSIS asks whether to install bundled OpenCode after Skills setup
+- Settings → OpenCode editor: bundle status, install, open
+
+### Developer & Governance
+- `fetch-opencode-desktop.ps1` + `joint-build.ps1`; CI fetches pinned installer on Windows
+- Tauri resources + NSIS hooks; `opencode_bundle` commands
+
 ## [1.2.0] - 2026-07-28
 
 ### Release Overview

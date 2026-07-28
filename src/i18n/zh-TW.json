@@ -626,6 +626,18 @@
   "settings": {
     "title": "設定",
     "supportedAgents": "支援的 Agent",
+    "openCode": {
+      "title": "OpenCode 編輯器",
+      "desc": "可選配套編輯器。安裝 Skills 時可一併勾選；也可在此安裝捆綁包或開啟已安裝的 OpenCode。",
+      "statusInstalled": "已安裝",
+      "statusMissing": "未安裝編輯器",
+      "bundlePresent": "安裝包內含捆綁安裝程式",
+      "bundleMissing": "目前建置未捆綁 OpenCode（需聯合建置）",
+      "installBundled": "安裝捆綁的 OpenCode",
+      "installStarted": "已啟動 OpenCode 安裝程式",
+      "open": "開啟 OpenCode",
+      "opened": "已嘗試開啟 OpenCode"
+    },
     "agentsSummary": "已偵測 {{detected}} 個，已啟用 {{enabled}} 個，自訂 {{custom}} 個",
     "detectedAgents": "已偵測",
     "enabledAgents": "已啟用",
@@ -718,7 +730,7 @@
     "signedInAs": "目前帳號",
     "help": "說明",
     "about": "關於",
-    "version": "芯宏Skills仓库 V1.2.0",
+    "version": "芯宏Skills仓库 V1.2.1",
     "tagline": "跨平台。極簡、高效、無感多組合切換。",
     "checkUpdate": "檢查更新",
     "checking": "檢查中…",

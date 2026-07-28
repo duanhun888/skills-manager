@@ -25,6 +25,7 @@ import {
   GripVertical,
   LogOut,
   Server,
+  Download,
 } from "lucide-react";
 import {
   DndContext,
@@ -207,6 +208,46 @@ export function Settings() {
   const [serverProjects, setServerProjects] = useState<ServerProject[]>([]);
   const [projectLinkSaving, setProjectLinkSaving] = useState<string | null>(null);
   const [creatingServerProject, setCreatingServerProject] = useState(false);
+  const [openCodeStatus, setOpenCodeStatus] = useState<api.OpenCodeBundleStatus | null>(null);
+  const [openCodeBusy, setOpenCodeBusy] = useState(false);
+
+  const refreshOpenCodeStatus = useCallback(async () => {
+    try {
+      const status = await api.getOpenCodeBundleStatus();
+      setOpenCodeStatus(status);
+    } catch {
+      setOpenCodeStatus(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshOpenCodeStatus();
+  }, [refreshOpenCodeStatus]);
+
+  const handleInstallBundledOpenCode = async () => {
+    setOpenCodeBusy(true);
+    try {
+      await api.installBundledOpenCode();
+      toast.success(t("settings.openCode.installStarted"));
+      window.setTimeout(() => void refreshOpenCodeStatus(), 3000);
+    } catch (e) {
+      toast.error(getErrorMessage(e, t("common.error")));
+    } finally {
+      setOpenCodeBusy(false);
+    }
+  };
+
+  const handleOpenOpenCode = async () => {
+    setOpenCodeBusy(true);
+    try {
+      await api.openOpenCodeEditor(null);
+      toast.success(t("settings.openCode.opened"));
+    } catch (e) {
+      toast.error(getErrorMessage(e, t("common.error")));
+    } finally {
+      setOpenCodeBusy(false);
+    }
+  };
 
   const startEditPath = useCallback((key: string, currentPath: string) => {
     setEditingPathKey(key);
@@ -1053,6 +1094,75 @@ export function Settings() {
       </div>
 
       <div className="space-y-6">
+        {/* Bundled OpenCode editor */}
+        <section className="app-panel space-y-3 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="app-section-title flex items-center gap-2">
+                <AgentIcon agentKey="opencode" displayName="OpenCode" className="h-5 w-5" />
+                {t("settings.openCode.title")}
+              </h2>
+              <p className="mt-1 text-[13px] text-muted">{t("settings.openCode.desc")}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void refreshOpenCodeStatus()}
+              className="text-[13px] text-accent hover:text-accent-light"
+            >
+              {t("settings.refresh")}
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2 text-[12px]">
+            <span
+              className={cn(
+                "rounded-[5px] border px-2 py-0.5",
+                openCodeStatus?.desktop_installed || openCodeStatus?.cli_on_path
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                  : "border-border-subtle text-muted"
+              )}
+            >
+              {openCodeStatus?.desktop_installed || openCodeStatus?.cli_on_path
+                ? t("settings.openCode.statusInstalled")
+                : t("settings.openCode.statusMissing")}
+            </span>
+            <span
+              className={cn(
+                "rounded-[5px] border px-2 py-0.5",
+                openCodeStatus?.bundled_installer_present
+                  ? "border-accent/30 bg-accent/10 text-accent-light"
+                  : "border-border-subtle text-muted"
+              )}
+            >
+              {openCodeStatus?.bundled_installer_present
+                ? t("settings.openCode.bundlePresent")
+                : t("settings.openCode.bundleMissing")}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {openCodeStatus?.bundled_installer_present &&
+            !(openCodeStatus.desktop_installed || openCodeStatus.cli_on_path) ? (
+              <button
+                type="button"
+                disabled={openCodeBusy}
+                onClick={() => void handleInstallBundledOpenCode()}
+                className="app-button-primary text-[13px]"
+              >
+                {openCodeBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                {t("settings.openCode.installBundled")}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              disabled={openCodeBusy || !(openCodeStatus?.desktop_installed || openCodeStatus?.cli_on_path)}
+              onClick={() => void handleOpenOpenCode()}
+              className="inline-flex items-center gap-1.5 rounded-[6px] border border-border-subtle px-3 py-1.5 text-[13px] text-secondary hover:bg-surface-hover disabled:opacity-50"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              {t("settings.openCode.open")}
+            </button>
+          </div>
+        </section>
+
         {/* Agent status */}
         <section>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">

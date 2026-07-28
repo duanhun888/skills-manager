@@ -675,6 +675,18 @@
   "settings": {
     "title": "Settings",
     "supportedAgents": "Supported Agents",
+    "openCode": {
+      "title": "OpenCode editor",
+      "desc": "Optional companion editor. You can install it with Skills, from the bundled installer here, or open it if already installed.",
+      "statusInstalled": "Installed",
+      "statusMissing": "Editor not installed",
+      "bundlePresent": "Bundled installer included in this build",
+      "bundleMissing": "This build has no bundled OpenCode (needs joint build)",
+      "installBundled": "Install bundled OpenCode",
+      "installStarted": "OpenCode installer started",
+      "open": "Open OpenCode",
+      "opened": "Tried to open OpenCode"
+    },
     "agentsSummary": "{{detected}} detected, {{enabled}} enabled, {{custom}} custom",
     "detectedAgents": "Detected",
     "enabledAgents": "Enabled",
@@ -772,7 +784,7 @@
     "signedInAs": "Signed in as",
     "help": "Help",
     "about": "About",
-    "version": "芯宏Skills仓库 V1.2.0",
+    "version": "芯宏Skills仓库 V1.2.1",
     "tagline": "Cross-platform. Minimal, efficient, seamless multi-set switching.",
     "checkUpdate": "Check for Updates",
     "checking": "Checking…",

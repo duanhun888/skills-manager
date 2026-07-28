@@ -87,3 +87,8 @@ opencode/**/node_modules/
 opencode-*.zip
 tmp-logs.zip
 tmp-logs/
+
+# Bundled OpenCode Desktop installer (fetched at build time)
+src-tauri/resources/opencode/*.exe
+src-tauri/resources/opencode/VERSION.txt
+

@@ -1,5 +1,18 @@
 # 更新日志
 
+## [1.2.1] - 2026-07-28
+
+### 发布概览
+- Windows 安装包可捆绑 OpenCode 编辑器：安装结束可勾选安装，设置页可安装/打开
+
+### 用户可见更新
+- NSIS 安装完成后询问是否安装捆绑的 OpenCode Desktop
+- 设置 → OpenCode 编辑器：查看捆绑状态、安装、打开
+
+### 开发者与治理更新
+- `scripts/fetch-opencode-desktop.ps1` + `joint-build.ps1`；CI Windows 构建前拉取钉扎安装包
+- Tauri resources + NSIS hooks；`opencode_bundle` 命令
+
 ## [1.2.0] - 2026-07-28
 
 ### 发布概览

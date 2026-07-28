@@ -906,6 +906,10 @@ pub fn run() {
             commands::tools::reset_custom_tool_project_path,
             commands::tools::add_custom_tool,
             commands::tools::remove_custom_tool,
+            // OpenCode bundle
+            commands::opencode_bundle::get_opencode_bundle_status,
+            commands::opencode_bundle::install_bundled_opencode,
+            commands::opencode_bundle::open_opencode_editor,
             // Skills
             commands::skills::get_managed_skills,
             commands::skills::get_skills_for_preset,

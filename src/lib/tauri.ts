@@ -241,6 +241,25 @@ export const addCustomTool = (
 export const removeCustomTool = (key: string) =>
   invoke<void>("remove_custom_tool", { key });
 
+export interface OpenCodeBundleStatus {
+  bundled_installer_present: boolean;
+  bundled_installer_path: string | null;
+  desktop_installed: boolean;
+  desktop_path: string | null;
+  cli_on_path: boolean;
+}
+
+export const getOpenCodeBundleStatus = () =>
+  invoke<OpenCodeBundleStatus>("get_opencode_bundle_status");
+
+export const installBundledOpenCode = () =>
+  invoke<void>("install_bundled_opencode");
+
+export const openOpenCodeEditor = (projectPath?: string | null) =>
+  invoke<void>("open_opencode_editor", {
+    projectPath: projectPath ?? null,
+  });
+
 // ── Skills ──
 
 export const getManagedSkills = () =>

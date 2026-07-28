@@ -21,11 +21,13 @@ npm run tauri:dev          # 桌面客户端
 cd server && cargo run --bin skills-manager-server   # 中央 API
 ```
 
-联合构建（Skills + OpenCode，需本机 Bun 才会编 OpenCode 二进制）：
+联合构建（Windows，先拉 OpenCode 再打 Skills NSIS）：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\joint-build.ps1 -SkipElevate
 ```
+
+安装包结束时会询问是否安装捆绑的 OpenCode；也可在 **设置 → OpenCode 编辑器** 安装/打开。
 
 服务端配置见 `server/.env.example`。
 
