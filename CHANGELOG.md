@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.0] - 2026-07-28
+
+### Release Overview
+- Vendor OpenCode 1.18.4 source in-repo for joint build / bundled installer work
+
+### User-facing
+- No installer change yet (Skills-only build; combined package comes later)
+
+### Developer & Governance
+- Add vendored `opencode/` (pin in `OPENCODE_VERSION`)
+- Add `scripts/joint-build.ps1` and third-party notice
+
 ## [1.1.1] - 2026-07-23
 
 ### Release Overview
