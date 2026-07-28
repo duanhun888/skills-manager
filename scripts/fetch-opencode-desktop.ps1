@@ -19,15 +19,16 @@ $Asset = "opencode-desktop-$Arch.exe"
 $Url = "https://github.com/anomalyco/opencode/releases/download/v$Version/$Asset"
 $Dest = Join-Path $OutDir $Asset
 $Meta = Join-Path $OutDir "VERSION.txt"
+$Pin = "$Version/$Arch"
 
 Write-Host "Fetching OpenCode Desktop $Version ($Arch)"
 Write-Host "  $Url"
 
 if ((Test-Path $Dest) -and (Test-Path $Meta)) {
     $existing = (Get-Content $Meta -Raw).Trim()
-    if ($existing -eq "$Version/$Arch") {
+    if ($existing -eq $Pin) {
         $sizeMb = [math]::Round((Get-Item $Dest).Length / 1MB, 1)
-        Write-Host "Already present: $Dest ($sizeMb MB) — skip download"
+        Write-Host "Already present: $Dest ($sizeMb MB) - skip download"
         exit 0
     }
 }
@@ -41,14 +42,15 @@ try {
     throw
 }
 
-Set-Content -Path $Meta -Value "$Version/$Arch" -NoNewline
-Set-Content -Path (Join-Path $OutDir "README.txt") -Value @"
-Bundled OpenCode Desktop installer (pinned).
-Version: $Version
-Arch: $Arch
-Source: $Url
-Do not commit the .exe — fetched at build time by scripts/fetch-opencode-desktop.ps1
-"@
+Set-Content -Path $Meta -Value $Pin -NoNewline -Encoding ascii
+$readmeLines = @(
+    "Bundled OpenCode Desktop installer (pinned)."
+    "Version: $Version"
+    "Arch: $Arch"
+    "Source: $Url"
+    "Fetched at build time by scripts/fetch-opencode-desktop.ps1 (do not commit the .exe)."
+)
+Set-Content -Path (Join-Path $OutDir "README.txt") -Value $readmeLines -Encoding ascii
 
 $sizeMb = [math]::Round((Get-Item $Dest).Length / 1MB, 1)
 Write-Host "OK: $Dest ($sizeMb MB)"
