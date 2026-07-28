@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.1] - 2026-07-28
+
+### Release Overview
+- Fix Windows CI: `build-opencode-desktop.ps1` ASCII-only so PowerShell 5.1 can parse it
+
+### Developer & Governance
+- Remove non-ASCII from PS1 scripts (UTF-8-without-BOM broke string parsing on `windows-latest`)
+
 ## [1.3.0] - 2026-07-28
 
 ### Release Overview

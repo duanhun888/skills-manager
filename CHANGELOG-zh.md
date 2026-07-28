@@ -1,5 +1,13 @@
 # 更新日志
 
+## [1.3.1] - 2026-07-28
+
+### 发布概览
+- 修复 Windows CI：`build-opencode-desktop.ps1` 改为纯 ASCII，避免 PowerShell 5.1 解析失败
+
+### 开发者与治理更新
+- PS1 去掉非 ASCII（GitHub `windows-latest` 无 BOM UTF-8 会把引号读坏）
+
 ## [1.3.0] - 2026-07-28
 
 ### 发布概览

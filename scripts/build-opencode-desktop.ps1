@@ -1,4 +1,4 @@
-# Build 芯宏定制 OpenCode Desktop (DEV / 需求工作台) from vendored opencode/
+# Build customized OpenCode Desktop (DEV / requirements workbench) from vendored opencode/
 # and stage the Windows installer into src-tauri/resources/opencode/.
 #
 # Usage:
@@ -6,8 +6,11 @@
 #   powershell -ExecutionPolicy Bypass -File .\scripts\build-opencode-desktop.ps1 -SkipInstall
 #
 # Env:
-#   OPENCODE_CHANNEL   default: dev  (shows DEV badge + 需求工作台 UI)
+#   OPENCODE_CHANNEL   default: dev
 #   OPENCODE_SKIP_BUILD=1  if installer already staged, skip rebuild
+#
+# IMPORTANT: Keep this file ASCII-only (or UTF-8 with BOM). Windows PowerShell 5.1 on
+# GitHub Actions mis-parses UTF-8-without-BOM when non-ASCII bytes appear in strings.
 param(
     [switch]$SkipInstall,
     [ValidateSet("win-x64", "win-arm64")]
@@ -53,9 +56,10 @@ if ($env:OPENCODE_SKIP_BUILD -eq "1" -and (Test-Path $Dest) -and (Test-Path $Met
 function Assert-Bun {
     $bun = Get-Command bun -ErrorAction SilentlyContinue
     if (-not $bun) {
-        throw "bun is required to build OpenCode Desktop. Install from https://bun.sh"
+        throw "bun is required to build OpenCode Desktop. See https://bun.sh"
     }
-    Write-Host "bun: $((bun --version).Trim())"
+    $bunVer = (& bun --version).Trim()
+    Write-Host "bun: $bunVer"
 }
 
 Assert-Bun
@@ -94,11 +98,11 @@ try {
         $env:CSC_IDENTITY_AUTO_DISCOVERY = "false"
         $ebArgs = @("--win", "--publish", "never", "--config", "electron-builder.config.ts")
         if ($Arch -eq "win-arm64") { $ebArgs += "--arm64" } else { $ebArgs += "--x64" }
-        npx --yes electron-builder @ebArgs
+        & npx --yes electron-builder @ebArgs
         if ($LASTEXITCODE -ne 0) { throw "electron-builder failed" }
 
         $built = Get-ChildItem (Join-Path $DesktopDir "dist") -Filter "opencode-desktop-*.exe" -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -notmatch 'uninstall' } |
+            Where-Object { $_.Name -notmatch "uninstall" } |
             Sort-Object LastWriteTime -Descending |
             Select-Object -First 1
         if (-not $built) {
@@ -108,17 +112,18 @@ try {
         Copy-Item -Force $built.FullName $Dest
         Set-Content -Path $Meta -Value $Pin -NoNewline -Encoding ascii
         $readmeLines = @(
-            "Bundled OpenCode Desktop = 芯宏定制源码构建 (not anomalyco GitHub release)."
+            "Bundled OpenCode Desktop = custom source build (not anomalyco GitHub release)."
             "Source: opencode/ in this repo (requirements workbench / DEV channel)."
             "Pin: $PinVersion"
             "Channel: $Channel"
             "Arch: $Arch"
             "Built by scripts/build-opencode-desktop.ps1 (do not commit the .exe)."
         )
-        Set-Content -Path (Join-Path $OutDir "README.txt") -Value $readmeLines -Encoding utf8
+        Set-Content -Path (Join-Path $OutDir "README.txt") -Value $readmeLines -Encoding ascii
 
         $sizeMb = [math]::Round((Get-Item $Dest).Length / 1MB, 1)
-        Write-Host "OK: $Dest ($sizeMb MB) from $($built.Name)"
+        $builtName = $built.Name
+        Write-Host "OK: $Dest ($sizeMb MB) built-as $builtName"
     }
     finally {
         Pop-Location
