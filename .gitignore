@@ -38,7 +38,8 @@ secrets.json
 *.pfx
 
 # Central API (private for now — deploy / keep in a private repo)
-server/
+# Anchor to repo root so vendored opencode/packages/server is NOT ignored.
+/server/
 
 # Built installers — publish via GitHub Releases, not git
 release/**
@@ -71,7 +72,18 @@ Desktop.ini
 
 # Local agent / private notes (not for public repo)
 .claude
-docs
-reference
+/docs
+/reference
 CLAUDE.md
 .loop-log
+
+# Vendored OpenCode (anomalyco/opencode) — source tracked; build artifacts not
+opencode/**/out/
+opencode/**/dist/
+opencode/artifacts/
+opencode/.turbo/
+opencode/node_modules/
+opencode/**/node_modules/
+opencode-*.zip
+tmp-logs.zip
+tmp-logs/

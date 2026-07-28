@@ -8,9 +8,10 @@
 
 | 组件 | 说明 |
 |------|------|
-| 桌面客户端 | 安装、管理 Skills，同步到 Cursor / Claude Code 等 |
+| 桌面客户端 | 安装、管理 Skills，同步到 Cursor / Claude Code / OpenCode 等 |
 | 中央 API（`server/`） | 用户认证、Skill 元数据、OBS 内容存储、代码审查 |
 | GitLab CI 样板（`examples/gitlab/`） | 按组织 Skill 审查提交与合并 |
+| OpenCode（`opencode/`） | 钉扎的上游开源编辑器源码，供联合构建 / 合体安装包（见 `OPENCODE_VERSION`） |
 
 ## 开发
 
@@ -18,6 +19,12 @@
 npm install
 npm run tauri:dev          # 桌面客户端
 cd server && cargo run --bin skills-manager-server   # 中央 API
+```
+
+联合构建（Skills + OpenCode，需本机 Bun 才会编 OpenCode 二进制）：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\joint-build.ps1 -SkipElevate
 ```
 
 服务端配置见 `server/.env.example`。
