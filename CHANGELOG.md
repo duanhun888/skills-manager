@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.2.2] - 2026-07-28
+
+### Release Overview
+- Re-release of 1.2.1 features (fix GitHub Release asset name conflicts that failed Linux/macOS uploads)
+
+### User-facing
+- Same as 1.2.1: Windows can bundle OpenCode Desktop
+
+### Developer & Governance
+- New tag avoids leftover `ReleaseAsset already_exists` conflicts
+
 ## [1.2.1] - 2026-07-28
 
 ### Release Overview
