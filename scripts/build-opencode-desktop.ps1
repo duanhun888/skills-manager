@@ -64,11 +64,28 @@ function Assert-Bun {
 
 Assert-Bun
 
+$SkillsVersion = "unknown"
+$PkgJson = Join-Path $Root "package.json"
+if (Test-Path $PkgJson) {
+    try {
+        $SkillsVersion = (Get-Content $PkgJson -Raw | ConvertFrom-Json).version
+    } catch {
+        $SkillsVersion = "unknown"
+    }
+}
+if (-not $env:VITE_OPENCODE_DISPLAY_VERSION) {
+    $env:VITE_OPENCODE_DISPLAY_VERSION = $SkillsVersion
+}
+if (-not $env:OPENCODE_DISPLAY_VERSION) {
+    $env:OPENCODE_DISPLAY_VERSION = $env:VITE_OPENCODE_DISPLAY_VERSION
+}
+
 Write-Host "Building OpenCode Desktop from source"
 Write-Host "  root:    $OpenCodeRoot"
 Write-Host "  channel: $Channel"
 Write-Host "  pin:     $PinVersion"
 Write-Host "  arch:    $Arch"
+Write-Host "  badge:   V$($env:VITE_OPENCODE_DISPLAY_VERSION)"
 
 Push-Location $OpenCodeRoot
 try {

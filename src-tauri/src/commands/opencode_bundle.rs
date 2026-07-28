@@ -86,19 +86,25 @@ fn find_desktop_exe() -> Option<PathBuf> {
     let mut candidates: Vec<PathBuf> = Vec::new();
 
     if let Some(local) = dirs::data_local_dir() {
-        // electron-builder default-ish locations (prod + DEV channel)
+        // Prefer current productName "OpenCode"; keep legacy "OpenCode Dev" paths.
+        candidates.push(local.join("Programs").join("OpenCode").join("OpenCode.exe"));
         candidates.push(
             local
                 .join("Programs")
                 .join("OpenCode Dev")
                 .join("OpenCode Dev.exe"),
         );
-        candidates.push(local.join("Programs").join("OpenCode").join("OpenCode.exe"));
         candidates.push(local.join("Programs").join("opencode").join("OpenCode.exe"));
         candidates.push(
             local
                 .join("Programs")
                 .join("opencode-desktop")
+                .join("OpenCode.exe"),
+        );
+        candidates.push(
+            local
+                .join("Programs")
+                .join("opencode-dev")
                 .join("OpenCode.exe"),
         );
         candidates.push(
@@ -113,17 +119,16 @@ fn find_desktop_exe() -> Option<PathBuf> {
             home.join("AppData")
                 .join("Local")
                 .join("Programs")
-                .join("OpenCode Dev")
-                .join("OpenCode Dev.exe"),
+                .join("OpenCode")
+                .join("OpenCode.exe"),
         );
         candidates.push(
             home.join("AppData")
                 .join("Local")
                 .join("Programs")
-                .join("OpenCode")
-                .join("OpenCode.exe"),
+                .join("OpenCode Dev")
+                .join("OpenCode Dev.exe"),
         );
-        // Scoop shims / installs
         candidates.push(
             home
                 .join("scoop")

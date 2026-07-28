@@ -627,16 +627,16 @@
     "title": "設定",
     "supportedAgents": "支援的 Agent",
     "openCode": {
-      "title": "OpenCode Dev（需求工作台）",
-      "desc": "捆綁本倉庫定制版 OpenCode Dev（需求工作台），非官方商店版。安裝 Skills 時可一併勾選；也可在此安裝或開啟。",
+      "title": "OpenCode（需求工作台）",
+      "desc": "捆綁本倉庫定制版 OpenCode（需求工作台），非官方商店版。安裝 Skills 時可一併勾選；也可在此安裝或開啟。",
       "statusInstalled": "已安裝",
       "statusMissing": "未安裝編輯器",
       "bundlePresent": "安裝包內含定制版安裝程式",
-      "bundleMissing": "目前建置未捆綁 OpenCode Dev（需聯合建置）",
-      "installBundled": "安裝捆綁的 OpenCode Dev",
-      "installStarted": "已啟動 OpenCode Dev 安裝程式",
-      "open": "開啟 OpenCode Dev",
-      "opened": "已嘗試開啟 OpenCode Dev"
+      "bundleMissing": "目前建置未捆綁 OpenCode（需聯合建置）",
+      "installBundled": "安裝捆綁的 OpenCode",
+      "installStarted": "已啟動 OpenCode 安裝程式",
+      "open": "開啟 OpenCode",
+      "opened": "已嘗試開啟 OpenCode"
     },
     "agentsSummary": "已偵測 {{detected}} 個，已啟用 {{enabled}} 個，自訂 {{custom}} 個",
     "detectedAgents": "已偵測",

@@ -886,8 +886,22 @@ function TitlebarUpdateIconButton(props: { state: TitlebarUpdatePillState }) {
   )
 }
 
+function formatVersionBadge(raw?: string) {
+  if (!raw) return undefined
+  const trimmed = String(raw).trim()
+  if (!trimmed) return undefined
+  const withoutPrefix = trimmed.replace(/^v/i, "")
+  return `V${withoutPrefix}`.toUpperCase()
+}
+
 function ChannelIndicator(props: { debugTools?: { visible: boolean; toggle: () => void } }) {
+  const platform = usePlatform()
   const channel = import.meta.env.VITE_OPENCODE_CHANNEL
+  const label = () =>
+    formatVersionBadge(import.meta.env.VITE_OPENCODE_DISPLAY_VERSION) ||
+    formatVersionBadge(platform.version) ||
+    (channel ? channel.toUpperCase() : "DEV")
+
   if (channel === "dev" && props.debugTools) {
     return (
       <button
@@ -897,7 +911,7 @@ function ChannelIndicator(props: { debugTools?: { visible: boolean; toggle: () =
         aria-label="Toggle debug tools"
         aria-pressed={props.debugTools.visible}
       >
-        DEV
+        {label()}
       </button>
     )
   }
@@ -906,7 +920,7 @@ function ChannelIndicator(props: { debugTools?: { visible: boolean; toggle: () =
     <>
       {["beta", "dev"].includes(channel) && (
         <div class="bg-icon-interactive-base text-[#FFF] font-medium px-2 rounded-sm uppercase font-mono">
-          {channel.toUpperCase()}
+          {label()}
         </div>
       )}
     </>

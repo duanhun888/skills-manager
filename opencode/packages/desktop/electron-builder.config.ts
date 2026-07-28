@@ -115,7 +115,8 @@ function getConfig() {
       return {
         ...base,
         appId,
-        productName: "OpenCode Dev",
+        // Display name for Start Menu / desktop shortcut (no "Dev" suffix).
+        productName: "OpenCode",
         rpm: { packageName: "opencode-dev" },
       }
     }

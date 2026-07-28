@@ -50,7 +50,7 @@ import { migrate } from "./migrate"
 import { cleanupStoreFiles } from "./store-cleanup"
 
 const APP_NAMES: Record<string, string> = {
-  dev: "OpenCode Dev",
+  dev: "OpenCode",
   beta: "OpenCode Beta",
   prod: "OpenCode",
 }
@@ -136,7 +136,7 @@ const main = Effect.gen(function* () {
     process.env.XDG_STATE_HOME = join(root, "state")
     return root
   })()
-  app.setName(app.isPackaged ? APP_NAMES[CHANNEL] : "OpenCode Dev")
+  app.setName(app.isPackaged ? APP_NAMES[CHANNEL] : "OpenCode")
   app.setAppUserModelId(appId)
   app.setPath(
     "userData",

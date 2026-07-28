@@ -2,6 +2,8 @@ interface ImportMetaEnv {
   readonly VITE_OPENCODE_SERVER_HOST: string
   readonly VITE_OPENCODE_SERVER_PORT: string
   readonly VITE_OPENCODE_CHANNEL?: "dev" | "beta" | "prod"
+  /** Optional display version for titlebar badge, e.g. "1.3.2c" -> "V1.3.2C" */
+  readonly VITE_OPENCODE_DISPLAY_VERSION?: string
 
   readonly VITE_SENTRY_DSN?: string
   readonly VITE_SENTRY_ENVIRONMENT?: string
