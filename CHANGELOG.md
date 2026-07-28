@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.2] - 2026-07-28
+
+### Release Overview
+- Fix Windows CI: commit packages/opencode/script/build-node.ts because it is ignored by upstream .gitignore (fresh checkout missing it).
+
+### Developer & Governance
+- Ensure OpenCode Desktop prebuild can run in a clean GitHub Actions environment.
+
 ## [1.3.1] - 2026-07-28
 
 ### Release Overview
@@ -40,7 +48,7 @@
 
 ### User-facing
 - NSIS asks whether to install bundled OpenCode after Skills setup
-- Settings â†’ OpenCode editor: bundle status, install, open
+- Settings â†?OpenCode editor: bundle status, install, open
 
 ### Developer & Governance
 - `fetch-opencode-desktop.ps1` + `joint-build.ps1`; CI fetches pinned installer on Windows
