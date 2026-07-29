@@ -96,6 +96,8 @@ export interface ServerSkill {
 export interface ServerPublicConfig {
   obs_enabled: boolean;
   max_content_bytes: number;
+  model_policy_mode?: "open" | "restricted" | string;
+  requirements_only_models?: string[];
 }
 
 export class ServerApiError extends Error {
@@ -339,6 +341,50 @@ export async function fetchServerPublicConfig(
   return invoke<ServerPublicConfig>("server_fetch_public_config", {
     baseUrl: normalizeBaseUrl(baseUrl),
   });
+}
+
+export async function updateServerModelPolicy(
+  baseUrl: string,
+  token: string,
+  body: {
+    mode: "open" | "restricted";
+    requirements_only_models?: string[];
+  }
+): Promise<ServerPublicConfig> {
+  const base = normalizeBaseUrl(baseUrl);
+  try {
+    return await serverRequest<ServerPublicConfig>(
+      base,
+      token,
+      "POST",
+      "/api/v1/server/model-policy",
+      body
+    );
+  } catch (err) {
+    const status = getHttpStatusFromError(err);
+    // Older builds only had PATCH /server/config; remote old builds have neither.
+    if (status === 404 || status === 405) {
+      try {
+        return await serverRequest<ServerPublicConfig>(
+          base,
+          token,
+          "PATCH",
+          "/api/v1/server/config",
+          body
+        );
+      } catch (err2) {
+        const status2 = getHttpStatusFromError(err2);
+        if (status2 === 404 || status2 === 405) {
+          throw new ServerApiError(
+            status2 ?? 404,
+            `当前中央服务 (${base}) 版本过旧，不支持模型策略保存。请部署最新 skills-manager-server 后重试。`
+          );
+        }
+        throw err2;
+      }
+    }
+    throw err;
+  }
 }
 
 export async function serverRequest<T>(

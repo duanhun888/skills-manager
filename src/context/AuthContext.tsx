@@ -111,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 "permissions"
               ).catch(() => setPermissions([]));
             }
+            void api.syncOpenCodeModelPolicyFromServer(savedUrl);
           } catch {
             setStoredToken(null);
             if (!cancelled) {
@@ -156,6 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setStoredToken(result.access_token);
       setUser(result.user);
       await loadPermissions(serverApiUrl, result.access_token);
+      void api.syncOpenCodeModelPolicyFromServer(serverApiUrl);
     },
     [serverApiUrl, loadPermissions]
   );

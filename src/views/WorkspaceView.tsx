@@ -3,6 +3,7 @@ import { useParams, useNavigate, Navigate } from "react-router-dom";
 import {
   ChevronRight,
   Download,
+  ExternalLink,
   FileText,
   Globe,
   LayoutGrid,
@@ -19,6 +20,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { cn } from "../utils";
 import { useApp } from "../context/AppContext";
+import { useAuth } from "../context/useAuth";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { PresetBar } from "../components/PresetBar";
 import { AgentIcon } from "../components/AgentIcon";
@@ -214,6 +216,7 @@ export function WorkspaceView({ config }: { config: WorkspaceConfig }) {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { tools, managedSkills, presets, refreshManagedSkills, refreshTools } = useApp();
+  const { serverApiUrl } = useAuth();
 
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [search, setSearch] = useState("");
@@ -232,6 +235,11 @@ export function WorkspaceView({ config }: { config: WorkspaceConfig }) {
   const [uploadConfirmSkill, setUploadConfirmSkill] = useState<ProjectSkill | null>(null);
   const [pullConfirmSkill, setPullConfirmSkill] = useState<ProjectSkill | null>(null);
   const [deleteLocalConfirmSkill, setDeleteLocalConfirmSkill] = useState<ProjectSkill | null>(null);
+  const [openCodeBusy, setOpenCodeBusy] = useState(false);
+  const [openCodeVersionConfirm, setOpenCodeVersionConfirm] = useState<{
+    installed: string;
+    expected: string;
+  } | null>(null);
   const localDetailRequestRef = useRef(0);
 
   // Cross-category redirect: a deep link like /global-workspace/openclaw should
@@ -281,6 +289,61 @@ export function WorkspaceView({ config }: { config: WorkspaceConfig }) {
     [currentTool, installedTools]
   );
   const currentToolKey = currentTool?.key ?? null;
+
+  const launchOpenCode = useCallback(async () => {
+    setOpenCodeBusy(true);
+    try {
+      await api.syncOpenCodeModelPolicyFromServer(serverApiUrl);
+      await api.openOpenCodeEditor(null);
+      toast.success(t("settings.openCode.opened"));
+    } catch (e) {
+      const raw = getErrorMessage(e, t("common.error"));
+      const msg =
+        /not installed|not found|install_bundled|SKILLS_OPENCODE_DESKTOP/i.test(raw)
+          ? t("settings.openCode.notInstalled")
+          : raw;
+      toast.error(msg);
+    } finally {
+      setOpenCodeBusy(false);
+    }
+  }, [serverApiUrl, t]);
+
+  const handleOpenOpenCode = useCallback(async () => {
+    setOpenCodeBusy(true);
+    try {
+      const status = await api.getOpenCodeBundleStatus();
+      if (!status.desktop_installed && !status.cli_on_path) {
+        toast.error(t("settings.openCode.notInstalled"));
+        return;
+      }
+      if (
+        status.expected_version &&
+        status.installed_version &&
+        status.version_match === false
+      ) {
+        setOpenCodeVersionConfirm({
+          installed: status.installed_version,
+          expected: status.expected_version,
+        });
+        return;
+      }
+      if (status.expected_version && !status.installed_version && status.desktop_installed) {
+        toast.message(t("settings.openCode.versionUnknown"));
+      }
+      await api.syncOpenCodeModelPolicyFromServer(serverApiUrl);
+      await api.openOpenCodeEditor(null);
+      toast.success(t("settings.openCode.opened"));
+    } catch (e) {
+      const raw = getErrorMessage(e, t("common.error"));
+      const msg =
+        /not installed|not found|install_bundled|SKILLS_OPENCODE_DESKTOP/i.test(raw)
+          ? t("settings.openCode.notInstalled")
+          : raw;
+      toast.error(msg);
+    } finally {
+      setOpenCodeBusy(false);
+    }
+  }, [serverApiUrl, t]);
 
   const localSkillsRequestRef = useRef(0);
   const loadLocalSkills = useCallback(async () => {
@@ -776,6 +839,22 @@ export function WorkspaceView({ config }: { config: WorkspaceConfig }) {
               </button>
             </div>
 
+            {currentTool.key === "opencode" ? (
+              <button
+                type="button"
+                disabled={openCodeBusy}
+                onClick={() => void handleOpenOpenCode()}
+                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-border-subtle px-3 text-[13px] font-medium text-secondary transition-colors hover:bg-surface-hover disabled:opacity-50"
+              >
+                {openCodeBusy ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <ExternalLink className="h-3.5 w-3.5" />
+                )}
+                {t("settings.openCode.open")}
+              </button>
+            ) : null}
+
             <button
               onClick={() => setAddDialogOpen(true)}
               className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-accent px-3 text-[13px] font-medium text-white transition-colors hover:bg-accent-hover"
@@ -1036,6 +1115,18 @@ export function WorkspaceView({ config }: { config: WorkspaceConfig }) {
         confirmLabel={t("common.delete")}
         onClose={() => setDeleteLocalConfirmSkill(null)}
         onConfirm={() => deleteLocalConfirmSkill ? handleDeleteLocalSkill(deleteLocalConfirmSkill) : Promise.resolve()}
+      />
+      <ConfirmDialog
+        open={!!openCodeVersionConfirm}
+        title={t("settings.openCode.versionMismatchTitle")}
+        message={t("settings.openCode.versionMismatchMessage", {
+          installed: openCodeVersionConfirm?.installed ?? "",
+          expected: openCodeVersionConfirm?.expected ?? "",
+        })}
+        tone="warning"
+        confirmLabel={t("settings.openCode.versionMismatchConfirm")}
+        onClose={() => setOpenCodeVersionConfirm(null)}
+        onConfirm={() => launchOpenCode()}
       />
     </div>
   );

@@ -8,6 +8,8 @@ import type { PermissionDto, RoleDto } from "../lib/serverApi";
 import { parseRolePermissions, serverRequest } from "../lib/serverApi";
 import { isAppError } from "../lib/error";
 import { AdminUsers } from "./AdminUsers";
+import { AdminModelPolicy } from "./AdminModelPolicy";
+import { userIsOps } from "../lib/serverApi";
 
 function permsEqual(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;
@@ -18,7 +20,7 @@ function permsEqual(a: string[], b: string[]): boolean {
 
 export function AdminPanel() {
   const { t } = useTranslation();
-  const { serverApiUrl, can, refreshUser } = useAuth();
+  const { serverApiUrl, can, refreshUser, user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<number | null>(null);
   const [permissions, setPermissions] = useState<PermissionDto[]>([]);
@@ -30,13 +32,14 @@ export function AdminPanel() {
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const [newCode, setNewCode] = useState("");
   const [newName, setNewName] = useState("");
-  const [tab, setTab] = useState<"roles" | "users">("roles");
+  const [tab, setTab] = useState<"roles" | "users" | "policy">("roles");
 
   const token = getStoredToken();
   const canManage = can("role.manage");
   const canReadRoles = can("role.read");
   const canReadUsers = can("user.read");
-  const canAccess = canReadRoles || canReadUsers;
+  const isOps = userIsOps(user);
+  const canAccess = canReadRoles || canReadUsers || isOps;
 
   const groupedPermissions = useMemo(() => {
     const map = new Map<string, PermissionDto[]>();
@@ -91,7 +94,8 @@ export function AdminPanel() {
 
   useEffect(() => {
     if (!canReadRoles && canReadUsers) setTab("users");
-  }, [canReadRoles, canReadUsers]);
+    else if (!canReadRoles && !canReadUsers && isOps) setTab("policy");
+  }, [canReadRoles, canReadUsers, isOps]);
 
   const isDirty = (roleId: number) =>
     !permsEqual(draftPerms[roleId] ?? [], savedPerms[roleId] ?? []) ||
@@ -173,7 +177,7 @@ export function AdminPanel() {
     );
   }
 
-  const showTabs = canReadRoles && canReadUsers;
+  const showTabs = [canReadRoles, canReadUsers, isOps].filter(Boolean).length > 1;
 
   return (
     <div className="app-page">
@@ -185,25 +189,40 @@ export function AdminPanel() {
         <p className="app-page-subtitle text-tertiary">{t("admin.subtitle")}</p>
         {showTabs && (
           <div className="app-segmented inline-flex mt-3">
-            <button
-              type="button"
-              onClick={() => setTab("roles")}
-              className={`app-segmented-button ${tab === "roles" ? "app-segmented-button-active" : ""}`}
-            >
-              {t("admin.tabRoles")}
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab("users")}
-              className={`app-segmented-button ${tab === "users" ? "app-segmented-button-active" : ""}`}
-            >
-              {t("admin.tabUsers")}
-            </button>
+            {canReadRoles && (
+              <button
+                type="button"
+                onClick={() => setTab("roles")}
+                className={`app-segmented-button ${tab === "roles" ? "app-segmented-button-active" : ""}`}
+              >
+                {t("admin.tabRoles")}
+              </button>
+            )}
+            {canReadUsers && (
+              <button
+                type="button"
+                onClick={() => setTab("users")}
+                className={`app-segmented-button ${tab === "users" ? "app-segmented-button-active" : ""}`}
+              >
+                {t("admin.tabUsers")}
+              </button>
+            )}
+            {isOps && (
+              <button
+                type="button"
+                onClick={() => setTab("policy")}
+                className={`app-segmented-button ${tab === "policy" ? "app-segmented-button-active" : ""}`}
+              >
+                {t("admin.tabPolicy")}
+              </button>
+            )}
           </div>
         )}
       </div>
 
-      {tab === "users" && canReadUsers ? (
+      {tab === "policy" && isOps ? (
+        <AdminModelPolicy />
+      ) : tab === "users" && canReadUsers ? (
         loading ? (
           <div className="flex justify-center py-12">
             <Loader2 className="w-6 h-6 animate-spin text-muted" />

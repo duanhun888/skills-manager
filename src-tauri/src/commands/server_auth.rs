@@ -327,6 +327,14 @@ pub async fn server_download_bytes(
 pub struct ServerPublicConfigDto {
     pub obs_enabled: bool,
     pub max_content_bytes: u64,
+    #[serde(default = "default_model_policy_mode")]
+    pub model_policy_mode: String,
+    #[serde(default)]
+    pub requirements_only_models: Vec<String>,
+}
+
+fn default_model_policy_mode() -> String {
+    "open".into()
 }
 
 #[tauri::command]

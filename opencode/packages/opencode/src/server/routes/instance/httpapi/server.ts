@@ -10,6 +10,7 @@ import { Auth } from "@/auth"
 import { BackgroundJob } from "@/background/job"
 import { Command } from "@/command"
 import { Config } from "@/config/config"
+import { SkillsModelPolicy } from "@/config/model-policy"
 import { Workspace } from "@/control-plane/workspace"
 import { Env } from "@/env"
 import { EventV2Bridge } from "@/event-v2-bridge"
@@ -191,6 +192,18 @@ const docRoute = HttpRouter.use((router) => router.add("GET", "/doc", () => Effe
   Layer.provide(authOnlyRouterLayer),
 )
 
+const skillsModelPolicyRoute = HttpRouter.use((router) =>
+  router.add("GET", "/skills/model-policy", () =>
+    Effect.sync(() => {
+      const info = SkillsModelPolicy.current()
+      return HttpServerResponse.jsonUnsafe({
+        mode: info.mode,
+        requirements_only_models: info.requirementsOnlyModels,
+      })
+    }),
+  ),
+).pipe(Layer.provide(authOnlyRouterLayer))
+
 const uiRoute = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const fs = yield* FSUtil.Service
@@ -280,6 +293,7 @@ export function createRoutes(
     instanceRoutes,
     serverRoutes,
     docRoute,
+    skillsModelPolicyRoute,
     uiRoute,
   ).pipe(
     Layer.provide([

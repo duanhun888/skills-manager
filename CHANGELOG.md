@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.4.0] - 2026-07-29
+
+### Release Overview
+- OpenCode model policy: backend toggle open vs restricted (vision models requirements-only when restricted)
+
+### User-facing
+- Admin 「Model policy」 tab for ops
+- Sync policy to disk on Skills login / Open OpenCode
+- OpenCode: requirements agent; coding UI + prompt guard when restricted
+- Open OpenCode from Agents/Settings syncs policy first
+
+### Developer & Governance
+- OpenCode reads skills-model-policy.json; GET /skills/model-policy
+- Skills writes user + ProgramData policy files
+- Bundled OpenCode EXPECTED_VERSION.txt for version checks
+- Central API (server/, deploy separately) adds model-policy endpoints
 ## [1.3.3] - 2026-07-28
 
 ### Release Overview

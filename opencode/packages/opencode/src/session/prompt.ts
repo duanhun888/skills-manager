@@ -28,6 +28,7 @@ import { Command } from "../command"
 import { pathToFileURL, fileURLToPath } from "url"
 import { Config } from "@/config/config"
 import { ConfigMarkdown } from "@/config/markdown"
+import { SkillsModelPolicy } from "@/config/model-policy"
 import { SessionSummary } from "./summary"
 import { NamedError } from "@opencode-ai/core/util/error"
 import { SessionProcessor } from "./processor"
@@ -645,6 +646,19 @@ const layer = Layer.effect(
       }
 
       const model = input.model ?? ag.model ?? (yield* currentModel(input.sessionID))
+      try {
+        SkillsModelPolicy.assertCodingModelAllowed({
+          agent: ag.name,
+          providerID: model.providerID,
+          modelID: model.modelID,
+        })
+      } catch (err) {
+        const error = new NamedError.Unknown({
+          message: err instanceof Error ? err.message : String(err),
+        })
+        yield* events.publish(Session.Event.Error, { sessionID: input.sessionID, error: error.toObject() })
+        throw error
+      }
       const same = ag.model && model.providerID === ag.model.providerID && model.modelID === ag.model.modelID
       const full =
         !input.variant && ag.variant && same

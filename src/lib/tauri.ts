@@ -247,6 +247,9 @@ export interface OpenCodeBundleStatus {
   desktop_installed: boolean;
   desktop_path: string | null;
   cli_on_path: boolean;
+  expected_version: string | null;
+  installed_version: string | null;
+  version_match: boolean | null;
 }
 
 export const getOpenCodeBundleStatus = () =>
@@ -260,6 +263,31 @@ export const openOpenCodeEditor = (projectPath?: string | null) =>
     projectPath: projectPath ?? null,
   });
 
+export interface OpenCodeModelPolicy {
+  mode: string;
+  requirements_only_models: string[];
+}
+
+export const syncOpenCodeModelPolicy = (policy: OpenCodeModelPolicy) =>
+  invoke<string>("sync_opencode_model_policy", { policy });
+
+/** Fetch central model policy (if configured) and write it for OpenCode. */
+export async function syncOpenCodeModelPolicyFromServer(
+  serverApiUrl?: string | null
+): Promise<void> {
+  const base = serverApiUrl?.trim();
+  if (!base) return;
+  try {
+    const { fetchServerPublicConfig } = await import("./serverApi");
+    const cfg = await fetchServerPublicConfig(base);
+    await syncOpenCodeModelPolicy({
+      mode: cfg.model_policy_mode === "restricted" ? "restricted" : "open",
+      requirements_only_models: cfg.requirements_only_models ?? [],
+    });
+  } catch {
+    // Offline / no server — leave existing local policy file untouched.
+  }
+}
 // ── Skills ──
 
 export const getManagedSkills = () =>

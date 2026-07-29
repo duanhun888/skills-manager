@@ -13,6 +13,7 @@ import { type ModelKey, useModels } from "@/context/models"
 import { useServer } from "@/context/server"
 import { useServerSDK } from "@/context/server-sdk"
 import { showToast } from "@/utils/toast"
+import { useSkillsModelPolicy } from "@/utils/skills-model-policy"
 import {
   REQUIREMENT_ANALYSIS_SYSTEM,
   defaultAnalyzePrompt,
@@ -51,6 +52,7 @@ export function AssistantChatPanel(props: {
   const server = useServer()
   const serverSDK = useServerSDK()
   const models = useModels()
+  const skillsPolicy = useSkillsModelPolicy()
   const [draft, setDraft] = createSignal("")
   const [sending, setSending] = createSignal(false)
   const [error, setError] = createSignal<string>()
@@ -104,16 +106,29 @@ export function AssistantChatPanel(props: {
   }
 
   const fallbackModel = createMemo(() => {
+    const list = models.list()
+    const policy = skillsPolicy.policy()
+    if (policy.mode === "restricted" && policy.requirements_only_models.length > 0) {
+      const preferred = policy.requirements_only_models
+        .map((key) => {
+          const [providerID, ...rest] = key.split("/")
+          const modelID = rest.join("/")
+          if (!providerID || !modelID) return undefined
+          return models.find({ providerID, modelID })
+        })
+        .find(Boolean)
+      if (preferred) return preferred
+    }
     const recent = models.recent.list()[0]
     if (recent) {
       const found = models.find(recent)
       if (found) return found
     }
-    const vision = models.list().find((item) => {
+    const vision = list.find((item) => {
       const modalities = (item as { modalities?: { input?: string[] } }).modalities?.input
       return Array.isArray(modalities) ? modalities.includes("image") : false
     })
-    return vision ?? models.list()[0]
+    return vision ?? list[0]
   })
 
   const model = createMemo(() => {
@@ -292,7 +307,7 @@ export function AssistantChatPanel(props: {
       const runPrompt = async (sessionID: string) =>
         client.session.prompt({
           sessionID,
-          agent: "plan",
+          agent: "requirements",
           model: { providerID: selected.provider.id, modelID: selected.id },
           system: REQUIREMENT_ANALYSIS_SYSTEM,
           parts: promptParts,

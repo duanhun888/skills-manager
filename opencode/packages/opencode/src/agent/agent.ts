@@ -179,6 +179,27 @@ const layer = Layer.effect(
             mode: "primary",
             native: true,
           },
+          requirements: {
+            name: "requirements",
+            description: "Requirements analysis workbench. Vision models may be limited to this agent by org policy.",
+            options: {},
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                question: "allow",
+                task: {
+                  general: "deny",
+                },
+                edit: {
+                  "*": "deny",
+                },
+              }),
+              user,
+            ),
+            mode: "primary",
+            hidden: true,
+            native: true,
+          },
           general: {
             name: "general",
             description: `General-purpose agent for researching complex questions and executing multi-step tasks. Use this agent to execute multiple units of work in parallel.`,

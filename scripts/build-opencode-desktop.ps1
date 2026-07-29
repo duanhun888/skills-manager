@@ -128,6 +128,7 @@ try {
 
         Copy-Item -Force $built.FullName $Dest
         Set-Content -Path $Meta -Value $Pin -NoNewline -Encoding ascii
+        Set-Content -Path (Join-Path $OutDir "EXPECTED_VERSION.txt") -Value $PinVersion -NoNewline -Encoding ascii
         $readmeLines = @(
             "Bundled OpenCode Desktop = custom source build (not anomalyco GitHub release)."
             "Source: opencode/ in this repo (requirements workbench / DEV channel)."
