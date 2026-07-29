@@ -5,6 +5,9 @@ export const PUBLIC_UI_PATHS = new Set<string>([
   "/site.webmanifest",
   "/web-app-manifest-192x192.png",
   "/web-app-manifest-512x512.png",
+  // Org model policy is written by Skills Manager to a local file; the desktop
+  // UI polls this without Basic credentials. Not a secret — just mode + model ids.
+  "/skills/model-policy",
 ])
 
 export function isPublicUIPath(method: string, pathname: string) {

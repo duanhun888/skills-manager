@@ -418,6 +418,49 @@ fn opencode_managed_config_dir() -> PathBuf {
     }
 }
 
+/// Expand policy entries so OpenCode can match real runtime IDs.
+/// Admin often writes `opencode/qwen3.7-plus` or `alibaba/...`, while the live
+/// provider on CN desktops is often `alibaba-cn/<same-model>`.
+fn expand_requirements_only_models(models: &[String]) -> Vec<String> {
+    const ALIASES: &[&str] = &["alibaba", "alibaba-cn", "opencode"];
+    let mut out: Vec<String> = Vec::new();
+    let mut seen = std::collections::HashSet::<String>::new();
+    let mut push = |value: String| {
+        let key = value.to_ascii_lowercase();
+        if seen.insert(key) {
+            out.push(value);
+        }
+    };
+
+    for raw in models {
+        let entry = raw.trim();
+        if entry.is_empty() {
+            continue;
+        }
+        push(entry.to_string());
+
+        let (provider, model) = match entry.split_once('/') {
+            Some((p, m)) => (Some(p.trim()), m.trim()),
+            None => (None, entry),
+        };
+        if model.is_empty() {
+            continue;
+        }
+        push(model.to_string());
+
+        let expand_aliases = match provider {
+            None => true,
+            Some(p) => ALIASES.iter().any(|a| a.eq_ignore_ascii_case(p)),
+        };
+        if expand_aliases {
+            for alias in ALIASES {
+                push(format!("{alias}/{model}"));
+            }
+        }
+    }
+    out
+}
+
 fn write_policy_file(dir: &Path, policy: &OpenCodeModelPolicyDto) -> Result<(), AppError> {
     std::fs::create_dir_all(dir)
         .map_err(|e| AppError::io(format!("create opencode config dir failed: {e}")))?;
@@ -426,9 +469,10 @@ fn write_policy_file(dir: &Path, policy: &OpenCodeModelPolicyDto) -> Result<(), 
         "restricted" => "restricted",
         _ => "open",
     };
+    let models = expand_requirements_only_models(&policy.requirements_only_models);
     let body = serde_json::json!({
         "mode": mode,
-        "requirements_only_models": policy.requirements_only_models,
+        "requirements_only_models": models,
         "updated_by": "skills-manager",
     });
     let text = serde_json::to_string_pretty(&body)

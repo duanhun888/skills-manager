@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.4.1] - 2026-07-29
+
+### Release Overview
+- Fix OpenCode model restriction: match real runtime IDs (e.g. `alibaba-cn/qwen3.7-plus`), not only exact admin strings
+- Fix coding UI ignoring policy: `/skills/model-policy` was 401 when desktop server password is set
+
+### User-facing
+- Restricted models hide/reject even when admin listed `opencode/...` or bare model id
+- Policy sync expands `alibaba` / `alibaba-cn` / `opencode` aliases onto disk for older OpenCode builds
+- Admin hint clarifies real provider/model IDs vs UI display names
+
+### Developer & Governance
+- Looser `entryMatches` (bare id, model token, provider aliases); UI keeps last good policy instead of failing open
+- GET `/skills/model-policy` is public (local org policy file); UI also sends Basic auth when configured
+- Unit tests for model-policy matching
+
 ## [1.4.0] - 2026-07-29
 
 ### Release Overview

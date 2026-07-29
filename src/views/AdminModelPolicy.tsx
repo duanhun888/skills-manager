@@ -15,9 +15,10 @@ import { getErrorMessage } from "../lib/error";
 type PolicyMode = "open" | "restricted";
 
 const DEFAULT_MODELS = [
-  "alibaba/qwen3-vl-plus",
-  "alibaba/qwen-vl-max",
-  "alibaba/qwen2.5-vl-72b-instruct",
+  "alibaba-cn/qwen3-vl-plus",
+  "alibaba-cn/qwen-vl-max",
+  "alibaba-cn/qwen2.5-vl-72b-instruct",
+  "alibaba-cn/qwen3.7-plus",
 ].join("\n");
 
 export function AdminModelPolicy() {
