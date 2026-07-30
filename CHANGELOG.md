@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.4] - 2026-07-30
+
+### Release Overview
+- Fix CI TypeScript error when syncing org provider credentials
+- Make Open OpenCode a large primary action on the OpenCode agent page
+
+### User-facing
+- OpenCode workspace: prominent open button in empty state / above skill list (removed from header)
+
+### Developer & Governance
+- Normalize optional API `type`/`key` into required `OpenCodeProviderAuthEntry` before Tauri invoke
+
 ## [1.4.3] - 2026-07-30
 
 ### Release Overview

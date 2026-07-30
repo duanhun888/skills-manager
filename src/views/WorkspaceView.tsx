@@ -840,22 +840,6 @@ export function WorkspaceView({ config }: { config: WorkspaceConfig }) {
               </button>
             </div>
 
-            {currentTool.key === "opencode" ? (
-              <button
-                type="button"
-                disabled={openCodeBusy}
-                onClick={() => void handleOpenOpenCode()}
-                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-border-subtle px-3 text-[13px] font-medium text-secondary transition-colors hover:bg-surface-hover disabled:opacity-50"
-              >
-                {openCodeBusy ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <ExternalLink className="h-3.5 w-3.5" />
-                )}
-                {t("settings.openCode.open")}
-              </button>
-            ) : null}
-
             <button
               onClick={() => setAddDialogOpen(true)}
               className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-accent px-3 text-[13px] font-medium text-white transition-colors hover:bg-accent-hover"
@@ -944,27 +928,77 @@ export function WorkspaceView({ config }: { config: WorkspaceConfig }) {
         )}
       </div>
 
+      {currentTool.key === "opencode" && visibleLocalSkills.length > 0 && !localSkillsLoading ? (
+        <div className="app-panel mb-4 flex flex-col items-stretch gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-[14px] font-semibold text-primary">{t("settings.openCode.open")}</p>
+            <p className="mt-0.5 text-[12px] text-muted">{t("settings.openCode.openHint")}</p>
+          </div>
+          <button
+            type="button"
+            disabled={openCodeBusy}
+            onClick={() => void handleOpenOpenCode()}
+            className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-lg bg-accent px-6 text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-accent-hover disabled:opacity-50"
+          >
+            {openCodeBusy ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <ExternalLink className="h-5 w-5" />
+            )}
+            {t("settings.openCode.open")}
+          </button>
+        </div>
+      ) : null}
+
       {localSkillsLoading ? (
         <div className="flex items-center gap-2 py-4 text-[13px] text-muted">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           {t("common.loading")}
         </div>
       ) : visibleLocalSkills.length === 0 ? (
-        <div className="flex min-h-[260px] flex-col items-center justify-center px-4 text-center">
+        <div className="flex min-h-[320px] flex-col items-center justify-center px-4 text-center">
           <Globe className="mb-4 h-12 w-12 text-faint" />
           <h3 className="mb-1.5 text-[14px] font-semibold text-tertiary">
             {localSkills.length === 0
               ? t("globalWorkspace.localSkills.empty")
               : t("mySkills.noMatch")}
           </h3>
-          {localSkills.length === 0 && (
-            <button
-              onClick={() => setAddDialogOpen(true)}
-              className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-accent-hover"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              {t("globalWorkspace.addSkill")}
-            </button>
+          {currentTool.key === "opencode" ? (
+            <div className="mt-6 flex w-full max-w-md flex-col items-center gap-3">
+              <button
+                type="button"
+                disabled={openCodeBusy}
+                onClick={() => void handleOpenOpenCode()}
+                className="inline-flex h-14 w-full max-w-sm items-center justify-center gap-2.5 rounded-xl bg-accent px-8 text-[16px] font-semibold text-white shadow-md transition-colors hover:bg-accent-hover disabled:opacity-50"
+              >
+                {openCodeBusy ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <ExternalLink className="h-5 w-5" />
+                )}
+                {t("settings.openCode.open")}
+              </button>
+              <p className="text-[12px] text-muted">{t("settings.openCode.openHint")}</p>
+              {localSkills.length === 0 && (
+                <button
+                  onClick={() => setAddDialogOpen(true)}
+                  className="mt-1 inline-flex items-center gap-1.5 rounded-md border border-border-subtle px-4 py-2 text-[13px] font-medium text-secondary transition-colors hover:bg-surface-hover"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  {t("globalWorkspace.addSkill")}
+                </button>
+              )}
+            </div>
+          ) : (
+            localSkills.length === 0 && (
+              <button
+                onClick={() => setAddDialogOpen(true)}
+                className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-accent-hover"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                {t("globalWorkspace.addSkill")}
+              </button>
+            )
           )}
         </div>
       ) : (

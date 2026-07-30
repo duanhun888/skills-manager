@@ -312,7 +312,13 @@ export async function syncOpenCodeProviderAuthFromServer(
   try {
     const { fetchServerProviderCredentials } = await import("./serverApi");
     const data = await fetchServerProviderCredentials(base, authToken);
-    const providers = data.providers ?? {};
+    const raw = data.providers ?? {};
+    const providers: Record<string, OpenCodeProviderAuthEntry> = {};
+    for (const [id, value] of Object.entries(raw)) {
+      const key = value.key?.trim() ?? "";
+      if (!id.trim() || !key) continue;
+      providers[id] = { type: value.type?.trim() || "api", key };
+    }
     if (Object.keys(providers).length === 0) return;
     await syncOpenCodeProviderAuth({ providers });
   } catch {
