@@ -65,7 +65,11 @@ export function entryMatches(entry: string, providerID: string, modelID: string)
   if (!normalizedEntry) return false
 
   const model = modelID.trim().toLowerCase()
-  const providers = providerAliases(providerID)
+  const runtimeProvider = providerID
+    .trim()
+    .toLowerCase()
+    .replace(/\.skills-shared$/i, "")
+  const providers = providerAliases(runtimeProvider)
   for (const provider of providers) {
     if (normalizedEntry === normalizeKey(provider, modelID)) return true
   }

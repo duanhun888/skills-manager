@@ -449,6 +449,9 @@ export function ModelSelectorPopoverV2(props: {
                         <Show when={orgProviders.isShared(group.items[0].provider.id)}>
                           <TagV2 class="shrink-0">{language.t("model.tag.shared")}</TagV2>
                         </Show>
+                        <Show when={orgProviders.isPersonal(group.items[0].provider.id)}>
+                          <TagV2 class="shrink-0">{language.t("model.tag.personal")}</TagV2>
+                        </Show>
                       </MenuV2.GroupLabel>
                       <MenuV2.RadioGroup value={current()}>
                         <For each={group.items}>
@@ -482,6 +485,9 @@ export function ModelSelectorPopoverV2(props: {
                                 <span class="min-w-0 truncate leading-5">{item.name}</span>
                                 <Show when={orgProviders.isShared(item.provider.id)}>
                                   <TagV2 class="shrink-0">{language.t("model.tag.shared")}</TagV2>
+                                </Show>
+                                <Show when={orgProviders.isPersonal(item.provider.id)}>
+                                  <TagV2 class="shrink-0">{language.t("model.tag.personal")}</TagV2>
                                 </Show>
                                 <Show when={isFree(item.provider.id, item.cost)}>
                                   <TagV2 class="shrink-0">{language.t("model.tag.free")}</TagV2>

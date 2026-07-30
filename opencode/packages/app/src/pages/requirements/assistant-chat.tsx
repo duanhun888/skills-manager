@@ -13,6 +13,7 @@ import { type ModelKey, useModels } from "@/context/models"
 import { useServer } from "@/context/server"
 import { useServerSDK } from "@/context/server-sdk"
 import { showToast } from "@/utils/toast"
+import { formatServerError, isLocalSessionNotFoundError, isSessionNotFoundError } from "@/utils/server-errors"
 import { useSkillsModelPolicy } from "@/utils/skills-model-policy"
 import {
   REQUIREMENT_ANALYSIS_SYSTEM,
@@ -265,8 +266,27 @@ export function AssistantChatPanel(props: {
       server.projects.touch(dir)
       const client = serverSDK().createClient({ directory: dir, throwOnError: true })
 
+      const isBareImageMimeError = (value: string) => /file part media type image\b/i.test(value)
+      const isMissingSessionError = (err: unknown, id: string) => {
+        if (isLocalSessionNotFoundError(err, id) || isSessionNotFoundError(err, id)) return true
+        const message = formatServerError(err)
+        return message.includes(`Session not found: ${id}`) || /session not found/i.test(message)
+      }
+
       const ensureSession = async (forceNew = false) => {
         let sessionID = forceNew ? undefined : props.project.analysisSessionID
+        if (sessionID) {
+          try {
+            await client.session.get({ sessionID })
+          } catch (err) {
+            if (isMissingSessionError(err, sessionID) || /session not found/i.test(formatServerError(err))) {
+              requirements.setAnalysisSessionID(props.project.id, undefined)
+              sessionID = undefined
+            } else {
+              throw err
+            }
+          }
+        }
         if (!sessionID) {
           const created = await client.session.create({
             title: `Requirements: ${props.project.title}`,
@@ -313,8 +333,6 @@ export function AssistantChatPanel(props: {
           parts: promptParts,
         })
 
-      const isBareImageMimeError = (value: string) => /file part media type image\b/i.test(value)
-
       // Image turns: always use a fresh analysis session so prior bad MIME parts cannot poison the request.
       let sessionID = await ensureSession(fileParts.length > 0)
       let result: Awaited<ReturnType<typeof runPrompt>>
@@ -322,7 +340,10 @@ export function AssistantChatPanel(props: {
         result = await runPrompt(sessionID)
       } catch (firstErr) {
         const firstMessage = firstErr instanceof Error ? firstErr.message : String(firstErr)
-        if (!isBareImageMimeError(firstMessage)) throw firstErr
+        const recreate =
+          isBareImageMimeError(firstMessage) || isMissingSessionError(firstErr, sessionID)
+        if (!recreate) throw firstErr
+        // Stale analysisSessionID after OpenCode restart / DB reset, or bad image MIME — start clean.
         requirements.setAnalysisSessionID(props.project.id, undefined)
         sessionID = await ensureSession(true)
         result = await runPrompt(sessionID)

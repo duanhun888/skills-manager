@@ -16,26 +16,38 @@ type Row = {
   id: string;
   providerId: string;
   key: string;
+  modelsText: string;
 };
 
-const DEFAULT_PROVIDERS = ["alibaba-cn", "deepseek"];
+const DEFAULT_ROWS: Row[] = [
+  {
+    id: "default-0",
+    providerId: "alibaba-cn",
+    key: "",
+    modelsText: "qwen3.7-plus\nqwen-plus",
+  },
+];
 
 function rowsFromProviders(
-  providers: Record<string, { type?: string; key?: string }>
+  providers: Record<string, { type?: string; key?: string; models?: string[] }>
 ): Row[] {
   const entries = Object.entries(providers);
   if (entries.length === 0) {
-    return DEFAULT_PROVIDERS.map((providerId, i) => ({
-      id: `default-${i}`,
-      providerId,
-      key: "",
-    }));
+    return DEFAULT_ROWS.map((row) => ({ ...row }));
   }
   return entries.map(([providerId, value], i) => ({
     id: `row-${i}-${providerId}`,
     providerId,
     key: value.key ?? "",
+    modelsText: (value.models ?? []).join("\n"),
   }));
+}
+
+function parseModels(text: string): string[] {
+  return text
+    .split(/[\n,;]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 export function AdminProviderCredentials() {
@@ -68,13 +80,18 @@ export function AdminProviderCredentials() {
 
   const save = async () => {
     if (!token || !isOps) return;
-    const providers: Record<string, { type: string; key: string }> = {};
+    const providers: Record<string, { type: string; key: string; models: string[] }> = {};
     for (const row of rows) {
       const providerId = row.providerId.trim();
       const key = row.key.trim();
       if (!providerId) continue;
       if (!key) continue;
-      providers[providerId] = { type: "api", key };
+      const models = parseModels(row.modelsText);
+      if (models.length === 0) {
+        toast.error(t("admin.credentials.modelsRequired", { provider: providerId }));
+        return;
+      }
+      providers[providerId] = { type: "api", key, models };
     }
     setSaving(true);
     try {
@@ -83,7 +100,11 @@ export function AdminProviderCredentials() {
         providers: Object.fromEntries(
           Object.entries(data.providers ?? {}).map(([id, value]) => [
             id,
-            { type: value.type || "api", key: value.key || "" },
+            {
+              type: value.type || "api",
+              key: value.key || "",
+              models: value.models ?? providers[id]?.models ?? [],
+            },
           ])
         ),
       });
@@ -119,47 +140,64 @@ export function AdminProviderCredentials() {
         <p className="text-[13px] text-tertiary mt-1">{t("admin.credentials.subtitle")}</p>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         {rows.map((row) => (
-          <div key={row.id} className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-end">
-            <label className="flex-1 space-y-1 min-w-0">
-              <span className="text-xs text-secondary">{t("admin.credentials.providerId")}</span>
-              <input
-                className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm font-mono"
-                value={row.providerId}
+          <div key={row.id} className="space-y-2 rounded-md border border-border p-3">
+            <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-end">
+              <label className="flex-1 space-y-1 min-w-0">
+                <span className="text-xs text-secondary">{t("admin.credentials.providerId")}</span>
+                <input
+                  className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm font-mono"
+                  value={row.providerId}
+                  onChange={(e) =>
+                    setRows((prev) =>
+                      prev.map((r) => (r.id === row.id ? { ...r, providerId: e.target.value } : r))
+                    )
+                  }
+                  placeholder="alibaba-cn"
+                  spellCheck={false}
+                />
+              </label>
+              <label className="flex-[1.6] space-y-1 min-w-0">
+                <span className="text-xs text-secondary">{t("admin.credentials.apiKey")}</span>
+                <input
+                  type="password"
+                  className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm font-mono"
+                  value={row.key}
+                  onChange={(e) =>
+                    setRows((prev) =>
+                      prev.map((r) => (r.id === row.id ? { ...r, key: e.target.value } : r))
+                    )
+                  }
+                  placeholder="sk-..."
+                  spellCheck={false}
+                  autoComplete="off"
+                />
+              </label>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center rounded-md border border-border px-2 py-2 text-muted hover:text-primary"
+                onClick={() => setRows((prev) => prev.filter((r) => r.id !== row.id))}
+                title={t("admin.credentials.remove")}
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+            <label className="block space-y-1">
+              <span className="text-xs text-secondary">{t("admin.credentials.models")}</span>
+              <textarea
+                className="w-full min-h-[72px] rounded-md border border-border bg-surface px-3 py-2 text-sm font-mono"
+                value={row.modelsText}
                 onChange={(e) =>
                   setRows((prev) =>
-                    prev.map((r) => (r.id === row.id ? { ...r, providerId: e.target.value } : r))
+                    prev.map((r) => (r.id === row.id ? { ...r, modelsText: e.target.value } : r))
                   )
                 }
-                placeholder="alibaba-cn"
+                placeholder={"qwen3.7-plus\nqwen-plus"}
                 spellCheck={false}
               />
+              <span className="text-[11px] text-tertiary">{t("admin.credentials.modelsHint")}</span>
             </label>
-            <label className="flex-[1.6] space-y-1 min-w-0">
-              <span className="text-xs text-secondary">{t("admin.credentials.apiKey")}</span>
-              <input
-                type="password"
-                className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm font-mono"
-                value={row.key}
-                onChange={(e) =>
-                  setRows((prev) =>
-                    prev.map((r) => (r.id === row.id ? { ...r, key: e.target.value } : r))
-                  )
-                }
-                placeholder="sk-..."
-                spellCheck={false}
-                autoComplete="off"
-              />
-            </label>
-            <button
-              type="button"
-              className="inline-flex items-center justify-center rounded-md border border-border px-2 py-2 text-muted hover:text-primary"
-              onClick={() => setRows((prev) => prev.filter((r) => r.id !== row.id))}
-              title={t("admin.credentials.remove")}
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
           </div>
         ))}
       </div>
@@ -171,7 +209,7 @@ export function AdminProviderCredentials() {
           onClick={() =>
             setRows((prev) => [
               ...prev,
-              { id: `new-${Date.now()}`, providerId: "", key: "" },
+              { id: `new-${Date.now()}`, providerId: "", key: "", modelsText: "" },
             ])
           }
         >

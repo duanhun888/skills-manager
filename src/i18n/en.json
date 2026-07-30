@@ -94,15 +94,18 @@
     },
     "credentials": {
       "title": "OpenCode model API keys",
-      "subtitle": "Ops configures org-wide provider keys. Synced models show as Shared; users can still add their own keys via Custom provider with a display name — both appear in the list.",
+      "subtitle": "Ops configures org-wide provider keys and an allowlist of models. Only listed models appear as Shared. Personal keys remain switchable.",
       "providerId": "Provider ID",
       "apiKey": "API Key",
+      "models": "Allowed models (required)",
+      "modelsHint": "One model id per line, e.g. qwen3.7-plus or alibaba-cn/qwen3.7-plus. Only listed models are exposed as Shared.",
+      "modelsRequired": "Add at least one allowed model for {{provider}}",
       "add": "Add provider",
       "remove": "Remove",
       "save": "Save and sync",
       "saved": "Model keys saved and synced locally",
       "opsOnly": "Only ops can change model keys",
-      "hint": "Common IDs: alibaba-cn, deepseek. Empty key skips that provider. Org keys are stored separately. For personal use, add a Custom provider with your own display name so it coexists with Shared."
+      "hint": "Common providers: alibaba-cn, deepseek. Shared keys are model-scoped to reduce misuse risk."
     },
     "users": {
       "create": "New user",
@@ -821,7 +824,7 @@
     "signedInAs": "Signed in as",
     "help": "Help",
     "about": "About",
-    "version": "芯宏Skills仓库 V1.4.4",
+    "version": "芯宏Skills仓库 V1.4.5",
     "tagline": "Cross-platform. Minimal, efficient, seamless multi-set switching.",
     "checkUpdate": "Check for Updates",
     "checking": "Checking…",

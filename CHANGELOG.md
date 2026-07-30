@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.4.5] - 2026-07-30
+
+### Release Overview
+- Shared provider keys are model-scoped (allowlist); Shared vs Personal entries can be switched
+- Fix requirements analysis Session not found after OpenCode restart
+
+### User-facing
+- Admin 「模型密钥」requires allowed models per provider; only listed models show as 共享
+- Same provider with personal + org keys appears as 共享 / 个人 for switching
+- Requirements chat recreates analysis session when the stored session is missing
+
+### Developer & Governance
+- Org marker stores `models` map; OpenCode filters shared provider catalogs to allowlist
+- Auth exposes colliding org keys as `{id}.skills-shared` so both sources coexist
+
 ## [1.4.4] - 2026-07-30
 
 ### Release Overview

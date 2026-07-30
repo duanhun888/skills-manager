@@ -274,6 +274,7 @@ export const syncOpenCodeModelPolicy = (policy: OpenCodeModelPolicy) =>
 export interface OpenCodeProviderAuthEntry {
   type: string;
   key: string;
+  models?: string[];
 }
 
 export interface OpenCodeProviderAuth {
@@ -316,8 +317,9 @@ export async function syncOpenCodeProviderAuthFromServer(
     const providers: Record<string, OpenCodeProviderAuthEntry> = {};
     for (const [id, value] of Object.entries(raw)) {
       const key = value.key?.trim() ?? "";
-      if (!id.trim() || !key) continue;
-      providers[id] = { type: value.type?.trim() || "api", key };
+      const models = (value.models ?? []).map((m) => m.trim()).filter(Boolean);
+      if (!id.trim() || !key || models.length === 0) continue;
+      providers[id] = { type: value.type?.trim() || "api", key, models };
     }
     if (Object.keys(providers).length === 0) return;
     await syncOpenCodeProviderAuth({ providers });

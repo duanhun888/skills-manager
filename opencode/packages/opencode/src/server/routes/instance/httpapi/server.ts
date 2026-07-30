@@ -211,6 +211,8 @@ const skillsOrgProvidersRoute = HttpRouter.use((router) =>
       const info = SkillsOrgProviders.current()
       return HttpServerResponse.jsonUnsafe({
         provider_ids: info.providerIds,
+        personal_ids: info.personalIds,
+        models: info.modelsByProvider,
       })
     }),
   ),

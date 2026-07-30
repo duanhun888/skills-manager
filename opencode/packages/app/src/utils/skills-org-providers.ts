@@ -1,11 +1,14 @@
 import { createMemo, createResource, createSignal, onCleanup } from "solid-js"
 import { useServer } from "@/context/server"
 
+const SKILLS_SHARED_SUFFIX = ".skills-shared"
+
 type OrgProviders = {
   provider_ids: string[]
+  personal_ids: string[]
 }
 
-const EMPTY: OrgProviders = { provider_ids: [] }
+const EMPTY: OrgProviders = { provider_ids: [], personal_ids: [] }
 let lastGood: OrgProviders = EMPTY
 
 function normalizeIds(raw: unknown): string[] {
@@ -14,6 +17,16 @@ function normalizeIds(raw: unknown): string[] {
     .filter((x): x is string => typeof x === "string")
     .map((x) => x.trim().toLowerCase())
     .filter(Boolean)
+}
+
+function baseProviderID(id: string) {
+  const normalized = id.trim().toLowerCase()
+  if (!normalized.endsWith(SKILLS_SHARED_SUFFIX)) return normalized
+  return normalized.slice(0, -SKILLS_SHARED_SUFFIX.length)
+}
+
+function isSharedAlias(id: string) {
+  return id.trim().toLowerCase().endsWith(SKILLS_SHARED_SUFFIX)
 }
 
 async function fetchOrgProviders(
@@ -34,6 +47,7 @@ async function fetchOrgProviders(
     const data = (await res.json()) as Partial<OrgProviders>
     const parsed: OrgProviders = {
       provider_ids: normalizeIds(data.provider_ids),
+      personal_ids: normalizeIds(data.personal_ids),
     }
     lastGood = parsed
     return parsed
@@ -42,7 +56,7 @@ async function fetchOrgProviders(
   }
 }
 
-/** Poll org-shared provider IDs from the local OpenCode server. */
+/** Poll org-shared vs personal provider IDs from the local OpenCode server. */
 export function useSkillsOrgProviders() {
   const server = useServer()
   const [tick, setTick] = createSignal(0)
@@ -60,12 +74,24 @@ export function useSkillsOrgProviders() {
 
   const current = createMemo(() => resource() ?? lastGood)
 
-  /** Org shared credentials are available for this provider (shown as 共享). */
+  /** Org shared entry (only-org real id, or `{id}.skills-shared` when both exist). */
   const isShared = (providerID: string) => {
     const id = providerID.trim().toLowerCase()
     if (!id) return false
-    return current().provider_ids.includes(id)
+    const p = current()
+    const base = baseProviderID(id)
+    if (!p.provider_ids.includes(base)) return false
+    if (isSharedAlias(id)) return true
+    return !p.personal_ids.includes(base)
   }
 
-  return { providers: current, isShared }
+  /** Personal entry when org share also exists — pick this row to use your own key. */
+  const isPersonal = (providerID: string) => {
+    const id = providerID.trim().toLowerCase()
+    if (!id || isSharedAlias(id)) return false
+    const p = current()
+    return p.provider_ids.includes(id) && p.personal_ids.includes(id)
+  }
+
+  return { providers: current, isShared, isPersonal }
 }

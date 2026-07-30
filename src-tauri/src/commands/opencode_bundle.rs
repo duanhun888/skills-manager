@@ -513,11 +513,14 @@ pub struct OpenCodeProviderAuthEntryDto {
     #[serde(rename = "type")]
     pub cred_type: String,
     pub key: String,
+    /// Allowed model ids for this shared provider (required for org sync).
+    #[serde(default)]
+    pub models: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OpenCodeProviderAuthDto {
-    /// Map of provider id → { type, key }. Org entries overwrite same ids in auth.json.
+    /// Map of provider id → { type, key, models }.
     pub providers: std::collections::HashMap<String, OpenCodeProviderAuthEntryDto>,
 }
 
@@ -550,6 +553,7 @@ pub async fn sync_opencode_provider_auth(
     tauri::async_runtime::spawn_blocking(move || {
         let mut org_map = serde_json::Map::new();
         let mut org_ids: Vec<String> = Vec::new();
+        let mut models_map = serde_json::Map::new();
         for (provider_id, entry) in &auth.providers {
             let id = provider_id.trim();
             if id.is_empty() {
@@ -557,6 +561,15 @@ pub async fn sync_opencode_provider_auth(
             }
             let key = entry.key.trim();
             if key.is_empty() {
+                continue;
+            }
+            let models: Vec<String> = entry
+                .models
+                .iter()
+                .map(|m| m.trim().to_string())
+                .filter(|m| !m.is_empty())
+                .collect();
+            if models.is_empty() {
                 continue;
             }
             let cred_type = if entry.cred_type.trim().is_empty() {
@@ -572,6 +585,15 @@ pub async fn sync_opencode_provider_auth(
                 }),
             );
             org_ids.push(id.to_string());
+            models_map.insert(
+                id.to_string(),
+                serde_json::Value::Array(
+                    models
+                        .into_iter()
+                        .map(serde_json::Value::String)
+                        .collect(),
+                ),
+            );
         }
 
         let body = serde_json::json!({
@@ -599,9 +621,10 @@ pub async fn sync_opencode_provider_auth(
             return Err(AppError::io("failed to write skills-org-auth.json".to_string()));
         }
 
-        // Marker for UI「共享」badge (provider ids only, no secrets).
+        // Marker for UI「共享」badge + allowed models (no secrets).
         let marker = serde_json::json!({
             "provider_ids": org_ids,
+            "models": models_map,
             "updated_by": "skills-manager",
         });
         let marker_text = serde_json::to_string_pretty(&marker)

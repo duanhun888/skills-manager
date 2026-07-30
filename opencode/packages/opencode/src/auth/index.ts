@@ -5,6 +5,14 @@ import { NonNegativeInt } from "@opencode-ai/core/schema"
 import { Global } from "@opencode-ai/core/global"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { ConfigManaged } from "@/config/managed"
+import { isSkillsSharedProviderID, skillsBaseProviderID, skillsSharedProviderID } from "./skills-shared"
+
+export {
+  isSkillsSharedProviderID,
+  skillsBaseProviderID,
+  skillsSharedProviderID,
+  SKILLS_SHARED_SUFFIX,
+} from "./skills-shared"
 
 export const OAUTH_DUMMY_KEY = "opencode-oauth-dummy-key"
 
@@ -101,18 +109,30 @@ const layer = Layer.effect(
 
     /**
      * Merged credentials for runtime.
-     * Org shared and personal custom providers coexist in the model list.
-     * Prefer a custom provider (with your own display name) for personal keys;
-     * if the same provider id has both, personal key is used for that id.
+     * Org shared and personal keys can both be selected:
+     * - only one source → real provider id
+     * - both → personal keeps real id (custom name); org is exposed as `{id}.skills-shared`
      */
     const all = Effect.fn("Auth.all")(function* () {
       const shared = yield* org()
       const own = yield* personal()
-      return { ...shared, ...own }
+      const out: Record<string, Info> = { ...shared }
+      for (const [id, info] of Object.entries(own)) {
+        if (out[id]) {
+          out[skillsSharedProviderID(id)] = out[id]
+        }
+        out[id] = info
+      }
+      return out
     })
 
     const get = Effect.fn("Auth.get")(function* (providerID: string) {
-      return (yield* all())[providerID]
+      const data = yield* all()
+      if (data[providerID]) return data[providerID]
+      if (isSkillsSharedProviderID(providerID)) {
+        return data[skillsBaseProviderID(providerID)]
+      }
+      return undefined
     })
 
     const set = Effect.fn("Auth.set")(function* (key: string, info: Info) {

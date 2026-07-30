@@ -12,6 +12,8 @@ import { serviceUse } from "@opencode-ai/core/effect/service-use"
 import { type LanguageModelV3 } from "@ai-sdk/provider"
 import { ModelsDev } from "@opencode-ai/core/models-dev"
 import { Auth } from "../auth"
+import { SKILLS_SHARED_SUFFIX, skillsBaseProviderID } from "../auth/skills-shared"
+import { SkillsOrgProviders } from "@/config/org-providers"
 import { Env } from "../env"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { iife } from "@/util/iife"
@@ -1529,6 +1531,28 @@ const layer = Layer.effect(
 
         // load apikeys
         const auths = yield* auth.all().pipe(Effect.orDie)
+        // When personal + org collide, org is exposed as `{id}.skills-shared` — clone catalog entry.
+        for (const id of Object.keys(auths)) {
+          if (!id.endsWith(SKILLS_SHARED_SUFFIX)) continue
+          const baseID = skillsBaseProviderID(id)
+          const base = database[baseID]
+          if (!base || database[id]) continue
+          const providerID = ProviderV2.ID.make(id)
+          database[id] = {
+            ...structuredClone(base),
+            id: providerID,
+            name: base.name,
+            models: Object.fromEntries(
+              Object.entries(base.models).map(([modelID, model]) => [
+                modelID,
+                {
+                  ...model,
+                  providerID,
+                },
+              ]),
+            ),
+          }
+        }
         for (const [id, provider] of Object.entries(auths)) {
           const providerID = ProviderV2.ID.make(id)
           if (disabled.has(providerID)) continue
@@ -1643,6 +1667,13 @@ const layer = Layer.effect(
                 pickBy(merged, (v) => !v.disabled),
                 (v) => omit(v, ["disabled"]),
               )
+            }
+          }
+
+          // Org shared keys are model-scoped: only allowlisted models stay visible/usable.
+          for (const modelID of Object.keys(provider.models)) {
+            if (!SkillsOrgProviders.isModelAllowedForSharedProvider(providerID, modelID)) {
+              delete provider.models[modelID]
             }
           }
 

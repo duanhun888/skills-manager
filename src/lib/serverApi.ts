@@ -388,7 +388,7 @@ export async function updateServerModelPolicy(
 }
 
 export interface ServerProviderCredentials {
-  providers: Record<string, { type?: string; key?: string }>;
+  providers: Record<string, { type?: string; key?: string; models?: string[] }>;
 }
 
 export async function fetchServerProviderCredentials(
@@ -406,7 +406,7 @@ export async function fetchServerProviderCredentials(
 export async function updateServerProviderCredentials(
   baseUrl: string,
   token: string,
-  providers: Record<string, { type: string; key: string }>
+  providers: Record<string, { type: string; key: string; models: string[] }>
 ): Promise<ServerProviderCredentials> {
   return serverRequest<ServerProviderCredentials>(
     normalizeBaseUrl(baseUrl),

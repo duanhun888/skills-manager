@@ -4,13 +4,18 @@ import { existsSync, readFileSync, statSync } from "fs"
 import path from "path"
 import { ConfigManaged } from "./managed"
 import { Global } from "@opencode-ai/core/global"
+import { isSkillsSharedProviderID, skillsBaseProviderID } from "@/auth/skills-shared"
 
 export type Info = {
-  /** Providers with org-shared credentials available. */
+  /** Providers with org-shared credentials available (base ids). */
   providerIds: string[]
+  /** Providers the user also configured personally (auth.json). */
+  personalIds: string[]
+  /** Allowed models per shared provider id (empty list = none). */
+  modelsByProvider: Record<string, string[]>
 }
 
-const DEFAULT: Info = { providerIds: [] }
+const DEFAULT: Info = { providerIds: [], personalIds: [], modelsByProvider: {} }
 
 type Cache = {
   mtimeKey: string
@@ -27,6 +32,10 @@ function orgMarkerPaths(): string[] {
   ]
 }
 
+function personalAuthPath() {
+  return path.join(Global.Path.data, "auth.json")
+}
+
 function parseOrgIds(raw: unknown): string[] {
   if (!raw || typeof raw !== "object") return []
   const obj = raw as Record<string, unknown>
@@ -39,6 +48,31 @@ function parseOrgIds(raw: unknown): string[] {
   return [...new Set(ids)]
 }
 
+function parseModelsByProvider(raw: unknown): Record<string, string[]> {
+  if (!raw || typeof raw !== "object") return {}
+  const obj = raw as Record<string, unknown>
+  const models = obj.models
+  if (!models || typeof models !== "object" || Array.isArray(models)) return {}
+  const out: Record<string, string[]> = {}
+  for (const [providerID, value] of Object.entries(models as Record<string, unknown>)) {
+    const id = providerID.trim().toLowerCase()
+    if (!id) continue
+    if (!Array.isArray(value)) continue
+    out[id] = value
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }
+  return out
+}
+
+function parsePersonalIds(raw: unknown): string[] {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return []
+  return Object.keys(raw as Record<string, unknown>)
+    .map((id) => id.trim().toLowerCase())
+    .filter(Boolean)
+}
+
 function fileStamp(file: string): string {
   if (!existsSync(file)) return `${file}:missing`
   try {
@@ -48,30 +82,102 @@ function fileStamp(file: string): string {
   }
 }
 
+function normalizeModelToken(raw: string) {
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/_/g, "-")
+    .replace(/\./g, "-")
+}
+
+function modelAllowed(entry: string, providerID: string, modelID: string): boolean {
+  const normalizedEntry = entry.trim().toLowerCase()
+  if (!normalizedEntry) return false
+  const model = modelID.trim().toLowerCase()
+  const provider = providerID.trim().toLowerCase()
+  if (normalizedEntry === `${provider}/${model}`) return true
+  if (normalizedEntry === model) return true
+  if (normalizeModelToken(normalizedEntry) === normalizeModelToken(modelID)) return true
+  const slash = normalizedEntry.indexOf("/")
+  if (slash >= 0) {
+    const entryModel = normalizedEntry.slice(slash + 1)
+    return normalizeModelToken(entryModel) === normalizeModelToken(modelID)
+  }
+  return false
+}
+
 function load(): Info {
+  let providerIds: string[] = []
+  let modelsByProvider: Record<string, string[]> = {}
   for (const file of orgMarkerPaths()) {
     if (!existsSync(file)) continue
     try {
-      const providerIds = parseOrgIds(JSON.parse(readFileSync(file, "utf8")))
-      if (providerIds.length > 0) return { providerIds }
+      const raw = JSON.parse(readFileSync(file, "utf8"))
+      providerIds = parseOrgIds(raw)
+      modelsByProvider = parseModelsByProvider(raw)
+      if (providerIds.length > 0 || Object.keys(modelsByProvider).length > 0) break
     } catch {
       continue
     }
   }
-  return DEFAULT
+
+  let personalIds: string[] = []
+  const authFile = personalAuthPath()
+  if (existsSync(authFile)) {
+    try {
+      personalIds = parsePersonalIds(JSON.parse(readFileSync(authFile, "utf8")))
+    } catch {
+      personalIds = []
+    }
+  }
+
+  return { providerIds, personalIds, modelsByProvider }
 }
 
 export function current(): Info {
-  const mtimeKey = orgMarkerPaths().map(fileStamp).join("|")
+  const mtimeKey = [...orgMarkerPaths(), personalAuthPath()].map(fileStamp).join("|")
   if (cache && cache.mtimeKey === mtimeKey) return cache.info
   const info = load()
   cache = { mtimeKey, info }
   return info
 }
 
-/** Org shared credential exists for this provider — show as 共享 alongside any personal/custom providers. */
+/** Show 共享 on org-only id, or on `{id}.skills-shared` when personal also exists. */
 export function isSharedProvider(providerID: string): boolean {
   const id = providerID.trim().toLowerCase()
   if (!id) return false
-  return current().providerIds.includes(id)
+  const info = current()
+  const base = skillsBaseProviderID(id).toLowerCase()
+  if (!info.providerIds.includes(base)) return false
+  if (isSkillsSharedProviderID(id)) return true
+  return !info.personalIds.includes(base)
+}
+
+/** Personal entry for a provider that also has org share (switchable pair). */
+export function isPersonalOverrideProvider(providerID: string): boolean {
+  const id = providerID.trim().toLowerCase()
+  if (!id || isSkillsSharedProviderID(id)) return false
+  const info = current()
+  return info.providerIds.includes(id) && info.personalIds.includes(id)
+}
+
+/**
+ * Allowed models for an org-shared provider instance.
+ * Returns null when this provider instance is not org-shared (no filtering).
+ * Returns [] when shared but no models configured (hide all).
+ */
+export function allowedModelsForSharedProvider(providerID: string): string[] | null {
+  if (!isSharedProvider(providerID)) return null
+  const base = skillsBaseProviderID(providerID).toLowerCase()
+  const info = current()
+  return info.modelsByProvider[base] ?? []
+}
+
+export function isModelAllowedForSharedProvider(providerID: string, modelID: string): boolean {
+  const allow = allowedModelsForSharedProvider(providerID)
+  if (allow === null) return true
+  if (allow.length === 0) return false
+  const base = skillsBaseProviderID(providerID)
+  return allow.some((entry) => modelAllowed(entry, base, modelID))
 }

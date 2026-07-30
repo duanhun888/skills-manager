@@ -94,15 +94,18 @@
     },
     "credentials": {
       "title": "OpenCode 模型密鑰",
-      "subtitle": "由 ops 統一配置組織級 API Key。下發後模型列表顯示「共享」；用戶仍可透過「自訂提供商」配置自己的密鑰並自訂顯示名稱，兩者可同時出現。",
+      "subtitle": "由 ops 統一配置組織級 API Key，並指定允許共享的模型；未列出的模型不會出現在共享列表中。個人配置仍可單獨使用並切換。",
       "providerId": "Provider ID",
       "apiKey": "API Key",
+      "models": "允許的模型（必填）",
+      "modelsHint": "每行一個模型 ID，如 qwen3.7-plus 或 alibaba-cn/qwen3.7-plus。只有列出的模型才會以「共享」展現可用。",
+      "modelsRequired": "請為 {{provider}} 至少填寫一個允許的模型",
       "add": "新增 Provider",
       "remove": "刪除",
       "save": "儲存並下發",
       "saved": "模型密鑰已儲存並同步到本機",
       "opsOnly": "僅運維（ops）可修改模型密鑰",
-      "hint": "常用 ID：alibaba-cn、deepseek。留空 Key 表示不下發。組織密鑰單獨存放，不覆蓋個人配置。個人請用自訂提供商設顯示名稱，與共享條目共存顯示。"
+      "hint": "常用 Provider：alibaba-cn、deepseek。共享密鑰按模型白名單生效，降低整站模型被濫用的風險。"
     },
     "users": {
       "create": "新建用戶",
@@ -767,7 +770,7 @@
     "signedInAs": "目前帳號",
     "help": "說明",
     "about": "關於",
-    "version": "芯宏Skills仓库 V1.4.4",
+    "version": "芯宏Skills仓库 V1.4.5",
     "tagline": "跨平台。極簡、高效、無感多組合切換。",
     "checkUpdate": "檢查更新",
     "checking": "檢查中…",
