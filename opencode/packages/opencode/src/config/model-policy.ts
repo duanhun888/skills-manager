@@ -38,13 +38,14 @@ function normalizeKey(providerID: string, modelID: string) {
   return `${providerID.trim()}/${modelID.trim()}`.toLowerCase()
 }
 
-/** Turn "Qwen3.7 Plus" / "qwen3_7_plus" into "qwen3.7-plus" for loose matching. */
+/** Turn "Qwen3.7 Plus" / "qwen3_7_plus" / "qwen3-7-plus" into a comparable token. */
 function normalizeModelToken(raw: string) {
   return raw
     .trim()
     .toLowerCase()
     .replace(/\s+/g, "-")
     .replace(/_/g, "-")
+    .replace(/\./g, "-")
 }
 
 /** Providers that commonly expose the same model under different IDs (CN vs intl, etc.). */

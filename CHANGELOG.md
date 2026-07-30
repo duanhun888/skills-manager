@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.4.2] - 2026-07-30
+
+### Release Overview
+- Fix coding workbench model picker ignoring Skills policy (new-session used a separate selection path)
+
+### User-facing
+- Restricted models are hidden in 新建会话 / 编码工作台 picker, not only in other Local.model paths
+- Auto-switch away from a blocked model if it was previously selected
+
+### Developer & Governance
+- `createPromptModelSelection.visible` applies `useSkillsModelPolicy`
+- Model token normalize treats `.` like `-` (`qwen3.7-plus` ↔ `qwen3-7-plus`)
+
 ## [1.4.1] - 2026-07-29
 
 ### Release Overview

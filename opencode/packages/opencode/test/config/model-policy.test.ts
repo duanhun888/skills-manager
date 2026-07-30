@@ -23,6 +23,8 @@ describe("SkillsModelPolicy.entryMatches", () => {
 
   test("matches display-name style tokens", () => {
     expect(entryMatches("alibaba/Qwen3.7 Plus", "alibaba-cn", "qwen3.7-plus")).toBe(true)
+    expect(entryMatches("qwen3.7 plus", "alibaba-cn", "qwen3.7-plus")).toBe(true)
+    expect(entryMatches("qwen3.7-plus", "alibaba-cn", "qwen3-7-plus")).toBe(true)
   })
 
   test("does not match unrelated models", () => {

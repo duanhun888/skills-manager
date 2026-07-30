@@ -1,4 +1,4 @@
-import { batch, createMemo, startTransition } from "solid-js"
+import { batch, createEffect, createMemo, startTransition } from "solid-js"
 import { useModels } from "@/context/models"
 import type { ModelKey, ModelSelection } from "@/context/local"
 import { cycleModelVariant, getConfiguredAgentVariant, resolveModelVariant } from "@/context/model-variant"
@@ -6,6 +6,7 @@ import { usePrompt } from "@/context/prompt"
 import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
 import { useProviders } from "@/hooks/use-providers"
+import { useSkillsModelPolicy } from "@/utils/skills-model-policy"
 
 export function createPromptModelSelection(input: { agent: () => { model?: ModelKey; variant?: string } | undefined }) {
   const sdk = useSDK()
@@ -13,6 +14,7 @@ export function createPromptModelSelection(input: { agent: () => { model?: Model
   const models = useModels()
   const prompt = usePrompt()
   const providers = useProviders(() => sdk().directory)
+  const skillsPolicy = useSkillsModelPolicy()
   const connected = createMemo(() => new Set(providers.connected().map((item) => item.id)))
 
   const valid = (model: ModelKey) => {
@@ -20,26 +22,31 @@ export function createPromptModelSelection(input: { agent: () => { model?: Model
     return !!provider?.models[model.modelID] && connected().has(model.providerID)
   }
 
+  const codingAllowed = (model: ModelKey) => !skillsPolicy.isCodingBlocked(model.providerID, model.modelID)
+
   const configured = () => {
     const value = sync().data.config.model
     if (!value) return
     const [providerID, modelID] = value.split("/")
     const model = { providerID, modelID }
-    if (valid(model)) return model
+    if (valid(model) && codingAllowed(model)) return model
   }
 
-  const recent = () => models.recent.list().find(valid)
+  const recent = () => models.recent.list().find((item) => valid(item) && codingAllowed(item))
   const fallback = () => {
     const defaults = providers.default()
-    return providers.connected().flatMap((provider) => {
-      const modelID = defaults[provider.id] ?? Object.values(provider.models)[0]?.id
-      return modelID ? [{ providerID: provider.id, modelID }] : []
-    })[0]
+    return providers
+      .connected()
+      .flatMap((provider) => {
+        const modelID = defaults[provider.id] ?? Object.values(provider.models)[0]?.id
+        return modelID ? [{ providerID: provider.id, modelID }] : []
+      })
+      .find(codingAllowed)
   }
 
   const current = () => {
     const key = [prompt.model.current(), input.agent()?.model, configured(), recent(), fallback()].find(
-      (item): item is ModelKey => !!item && valid(item),
+      (item): item is ModelKey => !!item && valid(item) && codingAllowed(item),
     )
     if (!key) return
     return models.find(key)
@@ -48,8 +55,20 @@ export function createPromptModelSelection(input: { agent: () => { model?: Model
     models.recent
       .list()
       .map(models.find)
-      .filter((item): item is NonNullable<typeof item> => !!item),
+      .filter((item): item is NonNullable<typeof item> => !!item)
+      .filter((item) => codingAllowed({ providerID: item.provider.id, modelID: item.id })),
   )
+
+  // If the saved/prompt model is requirements-only, switch off it in coding UI.
+  createEffect(() => {
+    const selected = prompt.model.current()
+    if (!selected) return
+    if (!skillsPolicy.isCodingBlocked(selected.providerID, selected.modelID)) return
+    const next = [configured(), recent(), fallback()].find(
+      (item): item is ModelKey => !!item && valid(item) && codingAllowed(item),
+    )
+    prompt.model.set(next ? { ...next, variant: selected.variant } : undefined)
+  })
 
   const selection = {
     ready: models.ready,
@@ -66,6 +85,7 @@ export function createPromptModelSelection(input: { agent: () => { model?: Model
       if (next) selection.set({ providerID: next.provider.id, modelID: next.id })
     },
     set(item: ModelKey | undefined, options?: { recent?: boolean }) {
+      if (item && !codingAllowed(item)) return
       startTransition(() =>
         batch(() => {
           prompt.model.set(item ? { ...item, variant: prompt.model.current()?.variant } : undefined)
@@ -75,7 +95,11 @@ export function createPromptModelSelection(input: { agent: () => { model?: Model
         }),
       )
     },
-    visible: models.visible,
+    visible(item: ModelKey) {
+      if (!models.visible(item)) return false
+      if (!codingAllowed(item)) return false
+      return true
+    },
     setVisibility: models.setVisibility,
     variant: {
       configured() {

@@ -21,6 +21,7 @@ function normalizeModelToken(raw: string) {
     .toLowerCase()
     .replace(/\s+/g, "-")
     .replace(/_/g, "-")
+    .replace(/\./g, "-")
 }
 
 const PROVIDER_ALIAS_GROUPS: string[][] = [["alibaba", "alibaba-cn"]]
