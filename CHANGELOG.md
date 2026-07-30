@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.4.6] - 2026-07-30
+
+### Release Overview
+- Fix periodic UI flicker in the coding workbench model picker
+
+### User-facing
+- Model policy / org-provider polling no longer re-renders the UI every 15s when data is unchanged
+
+### Developer & Governance
+- Quiet 60s refresh; update Solid state only when fingerprint changes; skip polls while tab is hidden
 ## [1.4.5] - 2026-07-30
 
 ### Release Overview

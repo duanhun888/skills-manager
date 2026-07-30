@@ -1,7 +1,8 @@
-import { createMemo, createResource, createSignal, onCleanup } from "solid-js"
+import { createMemo, createSignal, onCleanup, onMount } from "solid-js"
 import { useServer } from "@/context/server"
 
 const SKILLS_SHARED_SUFFIX = ".skills-shared"
+const POLL_MS = 60_000
 
 type OrgProviders = {
   provider_ids: string[]
@@ -10,6 +11,11 @@ type OrgProviders = {
 
 const EMPTY: OrgProviders = { provider_ids: [], personal_ids: [] }
 let lastGood: OrgProviders = EMPTY
+let lastFingerprint = fingerprint(EMPTY)
+
+function fingerprint(data: OrgProviders) {
+  return `${data.provider_ids.join(",")}|${data.personal_ids.join(",")}`
+}
 
 function normalizeIds(raw: unknown): string[] {
   if (!Array.isArray(raw)) return []
@@ -45,36 +51,45 @@ async function fetchOrgProviders(
     const res = await fetch(url.toString(), { headers })
     if (!res.ok) return lastGood
     const data = (await res.json()) as Partial<OrgProviders>
-    const parsed: OrgProviders = {
+    return {
       provider_ids: normalizeIds(data.provider_ids),
       personal_ids: normalizeIds(data.personal_ids),
     }
-    lastGood = parsed
-    return parsed
   } catch {
     return lastGood
   }
 }
 
-/** Poll org-shared vs personal provider IDs from the local OpenCode server. */
+/** Org-shared vs personal provider IDs; refreshes quietly and only updates UI when data changes. */
 export function useSkillsOrgProviders() {
   const server = useServer()
-  const [tick, setTick] = createSignal(0)
+  const [current, setCurrent] = createSignal<OrgProviders>(lastGood)
   const baseUrl = createMemo(() => server.current?.http.url)
   const httpAuth = createMemo(() => server.current?.http)
 
-  const [resource] = createResource(
-    () => `${baseUrl() ?? ""}|${httpAuth()?.password ?? ""}|${tick()}`,
-    async () => fetchOrgProviders(baseUrl(), httpAuth()),
-    { initialValue: lastGood },
-  )
+  const refresh = async () => {
+    if (document.visibilityState === "hidden") return
+    const next = await fetchOrgProviders(baseUrl(), httpAuth())
+    const fp = fingerprint(next)
+    if (fp === lastFingerprint) return
+    lastFingerprint = fp
+    lastGood = next
+    setCurrent(next)
+  }
 
-  const timer = window.setInterval(() => setTick((n) => n + 1), 15_000)
-  onCleanup(() => window.clearInterval(timer))
+  onMount(() => {
+    void refresh()
+    const timer = window.setInterval(() => void refresh(), POLL_MS)
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refresh()
+    }
+    document.addEventListener("visibilitychange", onVisible)
+    onCleanup(() => {
+      window.clearInterval(timer)
+      document.removeEventListener("visibilitychange", onVisible)
+    })
+  })
 
-  const current = createMemo(() => resource() ?? lastGood)
-
-  /** Org shared entry (only-org real id, or `{id}.skills-shared` when both exist). */
   const isShared = (providerID: string) => {
     const id = providerID.trim().toLowerCase()
     if (!id) return false
@@ -85,7 +100,6 @@ export function useSkillsOrgProviders() {
     return !p.personal_ids.includes(base)
   }
 
-  /** Personal entry when org share also exists — pick this row to use your own key. */
   const isPersonal = (providerID: string) => {
     const id = providerID.trim().toLowerCase()
     if (!id || isSharedAlias(id)) return false

@@ -1,4 +1,4 @@
-import { createMemo, createResource, createSignal, onCleanup } from "solid-js"
+import { createMemo, createSignal, onCleanup, onMount } from "solid-js"
 import { useServer } from "@/context/server"
 
 export type SkillsModelPolicy = {
@@ -7,9 +7,15 @@ export type SkillsModelPolicy = {
 }
 
 const OPEN: SkillsModelPolicy = { mode: "open", requirements_only_models: [] }
+const POLL_MS = 60_000
 
 /** Last successful fetch — never silently fall back to open on transient errors. */
 let lastGood: SkillsModelPolicy = OPEN
+let lastFingerprint = fingerprint(OPEN)
+
+function fingerprint(data: SkillsModelPolicy) {
+  return `${data.mode}|${data.requirements_only_models.join("\n")}`
+}
 
 function normalizeKey(providerID: string, modelID: string) {
   return `${providerID.trim()}/${modelID.trim()}`.toLowerCase()
@@ -75,32 +81,41 @@ async function fetchPolicy(
     }
     const res = await fetch(url.toString(), { headers })
     if (!res.ok) return lastGood
-    const parsed = parsePolicy((await res.json()) as Partial<SkillsModelPolicy>)
-    lastGood = parsed
-    return parsed
+    return parsePolicy((await res.json()) as Partial<SkillsModelPolicy>)
   } catch {
     return lastGood
   }
 }
 
-/** Poll Skills model policy from the local OpenCode server. */
+/** Skills model policy; refreshes quietly and only updates UI when data changes. */
 export function useSkillsModelPolicy() {
   const server = useServer()
-  const [tick, setTick] = createSignal(0)
+  const [current, setCurrent] = createSignal<SkillsModelPolicy>(lastGood)
   const baseUrl = createMemo(() => server.current?.http.url)
   const httpAuth = createMemo(() => server.current?.http)
 
-  const [policy] = createResource(
-    () => `${baseUrl() ?? ""}|${httpAuth()?.password ?? ""}|${tick()}`,
-    async () => fetchPolicy(baseUrl(), httpAuth()),
-    { initialValue: lastGood },
-  )
+  const refresh = async () => {
+    if (document.visibilityState === "hidden") return
+    const next = await fetchPolicy(baseUrl(), httpAuth())
+    const fp = fingerprint(next)
+    if (fp === lastFingerprint) return
+    lastFingerprint = fp
+    lastGood = next
+    setCurrent(next)
+  }
 
-  // Soft refresh so Skills policy edits apply without restarting OpenCode.
-  const timer = window.setInterval(() => setTick((n) => n + 1), 15_000)
-  onCleanup(() => window.clearInterval(timer))
-
-  const current = createMemo(() => policy() ?? lastGood)
+  onMount(() => {
+    void refresh()
+    const timer = window.setInterval(() => void refresh(), POLL_MS)
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refresh()
+    }
+    document.addEventListener("visibilitychange", onVisible)
+    onCleanup(() => {
+      window.clearInterval(timer)
+      document.removeEventListener("visibilitychange", onVisible)
+    })
+  })
 
   const isCodingBlocked = (providerID: string, modelID: string) => {
     const p = current()
