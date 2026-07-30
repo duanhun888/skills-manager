@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.4.7] - 2026-07-30
+
+### Release Overview
+- Send-to-coding targets the linked open project instead of always creating a new session
+
+### User-facing
+- 「送入编码」reuses an open tab for the linked project, or opens that project's latest session; only creates a new draft when none exist
+
+### Developer & Governance
+- Add handoff helper to pick open tabs / latest root session for the linked directory
 ## [1.4.6] - 2026-07-30
 
 ### Release Overview

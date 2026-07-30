@@ -9,16 +9,20 @@ import { TextInputV2 } from "@opencode-ai/ui/v2/text-input-v2"
 import { useDirectoryPicker } from "@/components/directory-picker"
 import { attachmentMime } from "@/components/prompt-input/files"
 import { ACCEPTED_IMAGE_TYPES } from "@/constants/file-picker"
+import { useGlobal } from "@/context/global"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
 import { usePlatform } from "@/context/platform"
+import { createTabPromptState } from "@/context/prompt"
+import { createDraftPromptSession } from "@/context/prompt-state"
 import { useServer } from "@/context/server"
 import { useSettings } from "@/context/settings"
-import { useTabs } from "@/context/tabs"
+import { useTabs, tabKey, type Tab } from "@/context/tabs"
 import { base64Encode } from "@opencode-ai/core/util/encode"
 import { displayName } from "@/pages/layout/helpers"
 import { isIntegrationEmpty } from "./apifox"
 import { serializeRequirementBrief } from "./brief"
+import { findOpenTabForProject, pickLatestProjectSession } from "./handoff-coding"
 import { useRequirements } from "./context"
 import { DialogCreateRequirement } from "./dialog-create-requirement"
 import { DialogTapdConfig } from "./dialog-tapd"
@@ -376,6 +380,7 @@ export function RequirementsEditorPage() {
   const dialog = useDialog()
   const layout = useLayout()
   const server = useServer()
+  const global = useGlobal()
   const settings = useSettings()
   const tabs = useTabs()
   const platform = usePlatform()
@@ -688,6 +693,29 @@ export function RequirementsEditorPage() {
     }
   }
 
+  const applyBriefToTab = (tab: Tab, brief: string, sessionDirectory?: string) => {
+    const parts = [{ type: "text" as const, content: brief, start: 0, end: brief.length }]
+    if (tab.type === "draft") {
+      const promptSession = tabs.state(tab, "prompt", () => createDraftPromptSession(tab.draftID))
+      promptSession.set(parts, brief.length)
+      tabs.select(tab)
+      return true
+    }
+    const conn = server.current
+    if (!conn) return false
+    const ctx = global.ensureServerCtx(conn)
+    const directory =
+      sessionDirectory ?? tabs.info[tabKey(tab)]?.directory ?? ctx.sync.session.peek(tab.sessionId)?.directory
+    if (!directory) return false
+    const promptSession = createTabPromptState(tabs, tab, ctx.sdk.scope, {
+      dir: base64Encode(directory),
+      id: tab.sessionId,
+    })
+    promptSession.set(parts, brief.length)
+    tabs.select(tab)
+    return true
+  }
+
   const sendToCoding = async () => {
     const current = project()
     if (!current || sendingHandoff()) return
@@ -708,13 +736,44 @@ export function RequirementsEditorPage() {
       layout.projects.open(directory)
       server.projects.touch(directory)
 
+      const conn = server.current
+      if (!conn) {
+        setHandoffError(language.t("requirements.handoff.noProject"))
+        return
+      }
+      const ctx = global.ensureServerCtx(conn)
+
+      const openTab = findOpenTabForProject({
+        tabs: [...tabs.store],
+        server: server.key,
+        directory,
+        sessionDirectory: (sessionId) =>
+          tabs.info[tabKey({ type: "session", server: server.key, sessionId })]?.directory ??
+          ctx.sync.session.peek(sessionId)?.directory,
+      })
+      if (openTab && applyBriefToTab(openTab, brief)) return
+
+      await ctx.sync.project.loadSessions(directory)
+      const [child] = ctx.sync.child(directory, { bootstrap: false })
+      const latest = pickLatestProjectSession(child.session)
+      if (latest) {
+        const sessionTab = { type: "session" as const, server: server.key, sessionId: latest.id }
+        const tab = tabs.addSessionTab(sessionTab)
+        tabs.rememberSessionInfo(sessionTab, latest)
+        if (applyBriefToTab(tab, brief, latest.directory)) {
+          if (!settings.general.newLayoutDesigns()) {
+            navigate(`/${base64Encode(directory)}/session/${latest.id}`)
+          }
+          return
+        }
+      }
+
       if (settings.general.newLayoutDesigns()) {
         await tabs.newDraft({ server: server.key, directory }, brief)
         return
       }
 
-      const slug = base64Encode(directory)
-      navigate(`/${slug}/session?prompt=${encodeURIComponent(brief)}`)
+      navigate(`/${base64Encode(directory)}/session?prompt=${encodeURIComponent(brief)}`)
     } finally {
       setSendingHandoff(false)
     }
