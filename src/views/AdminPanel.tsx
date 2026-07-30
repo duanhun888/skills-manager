@@ -9,6 +9,7 @@ import { parseRolePermissions, serverRequest } from "../lib/serverApi";
 import { isAppError } from "../lib/error";
 import { AdminUsers } from "./AdminUsers";
 import { AdminModelPolicy } from "./AdminModelPolicy";
+import { AdminProviderCredentials } from "./AdminProviderCredentials";
 import { userIsOps } from "../lib/serverApi";
 
 function permsEqual(a: string[], b: string[]): boolean {
@@ -32,7 +33,7 @@ export function AdminPanel() {
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const [newCode, setNewCode] = useState("");
   const [newName, setNewName] = useState("");
-  const [tab, setTab] = useState<"roles" | "users" | "policy">("roles");
+  const [tab, setTab] = useState<"roles" | "users" | "policy" | "credentials">("roles");
 
   const token = getStoredToken();
   const canManage = can("role.manage");
@@ -216,11 +217,22 @@ export function AdminPanel() {
                 {t("admin.tabPolicy")}
               </button>
             )}
+            {isOps && (
+              <button
+                type="button"
+                onClick={() => setTab("credentials")}
+                className={`app-segmented-button ${tab === "credentials" ? "app-segmented-button-active" : ""}`}
+              >
+                {t("admin.tabCredentials")}
+              </button>
+            )}
           </div>
         )}
       </div>
 
-      {tab === "policy" && isOps ? (
+      {tab === "credentials" && isOps ? (
+        <AdminProviderCredentials />
+      ) : tab === "policy" && isOps ? (
         <AdminModelPolicy />
       ) : tab === "users" && canReadUsers ? (
         loading ? (

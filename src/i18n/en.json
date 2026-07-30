@@ -76,6 +76,7 @@
     "tabRoles": "Roles",
     "tabUsers": "Users",
     "tabPolicy": "Model policy",
+    "tabCredentials": "Model keys",
     "policy": {
       "title": "OpenCode model policy",
       "subtitle": "Control whether vision models (e.g. Qwen VL) are limited to the requirements workbench. Clients sync on login or when opening OpenCode.",
@@ -90,6 +91,18 @@
       "save": "Save policy",
       "saved": "Model policy saved",
       "opsOnly": "Only ops can change model policy"
+    },
+    "credentials": {
+      "title": "OpenCode model API keys",
+      "subtitle": "Ops configures org-wide provider keys. Synced models show as Shared; users can still add their own keys via Custom provider with a display name — both appear in the list.",
+      "providerId": "Provider ID",
+      "apiKey": "API Key",
+      "add": "Add provider",
+      "remove": "Remove",
+      "save": "Save and sync",
+      "saved": "Model keys saved and synced locally",
+      "opsOnly": "Only ops can change model keys",
+      "hint": "Common IDs: alibaba-cn, deepseek. Empty key skips that provider. Org keys are stored separately. For personal use, add a Custom provider with your own display name so it coexists with Shared."
     },
     "users": {
       "create": "New user",
@@ -807,7 +820,7 @@
     "signedInAs": "Signed in as",
     "help": "Help",
     "about": "About",
-    "version": "芯宏Skills仓库 V1.4.2",
+    "version": "芯宏Skills仓库 V1.4.3",
     "tagline": "Cross-platform. Minimal, efficient, seamless multi-set switching.",
     "checkUpdate": "Check for Updates",
     "checking": "Checking…",

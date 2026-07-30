@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.4.3] - 2026-07-30
+
+### Release Overview
+- Org-wide OpenCode provider API keys (ops) with Shared badge; personal custom providers coexist by display name
+- Requirements: associate any local folder; denser editor header for more workspace
+
+### User-facing
+- Admin 「模型密钥」: ops configure provider keys; sync on login / Open OpenCode into `skills-org-auth.json` (does not overwrite personal `auth.json`)
+- Model picker shows **共享** for org providers; personal setups use Custom provider + display name and appear alongside
+- Requirements create/editor: pick open/recent project or Browse any local folder
+
+### Developer & Governance
+- OpenCode Auth merges org + personal credentials; `GET /skills/org-providers` marks shared providers
+- Tauri `sync_opencode_provider_auth` writes org auth + provider marker files
+
 ## [1.4.2] - 2026-07-30
 
 ### Release Overview

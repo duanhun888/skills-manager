@@ -201,6 +201,8 @@ export const dict = {
   "provider.disconnect.toast.disconnected.title": "{{provider}} 已中斷連線",
   "provider.disconnect.toast.disconnected.description": "{{provider}} 模型已不再可用。",
   "model.tag.free": "免費",
+  "model.tag.shared": "共享",
+  "model.tag.personal": "個人",
   "model.tag.latest": "最新",
 
   "model.provider.anthropic": "Anthropic",
@@ -1071,4 +1073,7 @@ export const dict = {
   "error.childStore.persistedProjectIconCreateFailed": "建立持續性專案圖示失敗",
   "error.childStore.storeCreateFailed": "建立儲存區失敗",
   "terminal.connectionLost.abnormalClose": "WebSocket 異常關閉：{{code}}",
+  "requirements.create.noSystem": "還沒有開啟的專案。可點「瀏覽」選擇任意本機目錄，或稍後在編輯頁指定。",
+  "requirements.field.browseProject": "瀏覽",
+  "requirements.editor.noOpenProjects": "暫無專案，點「瀏覽」選擇本機目錄",
 } satisfies Partial<Record<Keys, string>>

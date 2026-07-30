@@ -911,6 +911,7 @@ pub fn run() {
             commands::opencode_bundle::install_bundled_opencode,
             commands::opencode_bundle::open_opencode_editor,
             commands::opencode_bundle::sync_opencode_model_policy,
+            commands::opencode_bundle::sync_opencode_provider_auth,
             // Skills
             commands::skills::get_managed_skills,
             commands::skills::get_skills_for_preset,

@@ -271,6 +271,18 @@ export interface OpenCodeModelPolicy {
 export const syncOpenCodeModelPolicy = (policy: OpenCodeModelPolicy) =>
   invoke<string>("sync_opencode_model_policy", { policy });
 
+export interface OpenCodeProviderAuthEntry {
+  type: string;
+  key: string;
+}
+
+export interface OpenCodeProviderAuth {
+  providers: Record<string, OpenCodeProviderAuthEntry>;
+}
+
+export const syncOpenCodeProviderAuth = (auth: OpenCodeProviderAuth) =>
+  invoke<string>("sync_opencode_provider_auth", { auth });
+
 /** Fetch central model policy (if configured) and write it for OpenCode. */
 export async function syncOpenCodeModelPolicyFromServer(
   serverApiUrl?: string | null
@@ -287,6 +299,36 @@ export async function syncOpenCodeModelPolicyFromServer(
   } catch {
     // Offline / no server — leave existing local policy file untouched.
   }
+}
+
+/** Fetch org provider API keys (requires login) and merge into OpenCode auth.json. */
+export async function syncOpenCodeProviderAuthFromServer(
+  serverApiUrl?: string | null,
+  token?: string | null
+): Promise<void> {
+  const base = serverApiUrl?.trim();
+  const authToken = token?.trim();
+  if (!base || !authToken) return;
+  try {
+    const { fetchServerProviderCredentials } = await import("./serverApi");
+    const data = await fetchServerProviderCredentials(base, authToken);
+    const providers = data.providers ?? {};
+    if (Object.keys(providers).length === 0) return;
+    await syncOpenCodeProviderAuth({ providers });
+  } catch {
+    // Offline / unauthorized / old server — leave local auth.json untouched.
+  }
+}
+
+/** Sync model policy + org provider keys for OpenCode. */
+export async function syncOpenCodeOrgConfigFromServer(
+  serverApiUrl?: string | null,
+  token?: string | null
+): Promise<void> {
+  await Promise.all([
+    syncOpenCodeModelPolicyFromServer(serverApiUrl),
+    syncOpenCodeProviderAuthFromServer(serverApiUrl, token),
+  ]);
 }
 // ── Skills ──
 

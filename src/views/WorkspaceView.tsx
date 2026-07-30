@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { cn } from "../utils";
 import { useApp } from "../context/AppContext";
 import { useAuth } from "../context/useAuth";
+import { getStoredToken } from "../lib/serverApi";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { PresetBar } from "../components/PresetBar";
 import { AgentIcon } from "../components/AgentIcon";
@@ -293,7 +294,7 @@ export function WorkspaceView({ config }: { config: WorkspaceConfig }) {
   const launchOpenCode = useCallback(async () => {
     setOpenCodeBusy(true);
     try {
-      await api.syncOpenCodeModelPolicyFromServer(serverApiUrl);
+      await api.syncOpenCodeOrgConfigFromServer(serverApiUrl, getStoredToken());
       await api.openOpenCodeEditor(null);
       toast.success(t("settings.openCode.opened"));
     } catch (e) {
@@ -330,7 +331,7 @@ export function WorkspaceView({ config }: { config: WorkspaceConfig }) {
       if (status.expected_version && !status.installed_version && status.desktop_installed) {
         toast.message(t("settings.openCode.versionUnknown"));
       }
-      await api.syncOpenCodeModelPolicyFromServer(serverApiUrl);
+      await api.syncOpenCodeOrgConfigFromServer(serverApiUrl, getStoredToken());
       await api.openOpenCodeEditor(null);
       toast.success(t("settings.openCode.opened"));
     } catch (e) {

@@ -240,7 +240,7 @@ export function Settings() {
   const handleOpenOpenCode = async () => {
     setOpenCodeBusy(true);
     try {
-      await api.syncOpenCodeModelPolicyFromServer(serverApiUrl);
+      await api.syncOpenCodeOrgConfigFromServer(serverApiUrl, getStoredToken());
       await api.openOpenCodeEditor(null);
       toast.success(t("settings.openCode.opened"));
     } catch (e) {

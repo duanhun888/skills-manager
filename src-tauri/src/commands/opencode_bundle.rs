@@ -507,3 +507,122 @@ pub async fn sync_opencode_model_policy(
     .await
     .map_err(|e| AppError::io(format!("join error: {e}")))?
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenCodeProviderAuthEntryDto {
+    #[serde(rename = "type")]
+    pub cred_type: String,
+    pub key: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenCodeProviderAuthDto {
+    /// Map of provider id → { type, key }. Org entries overwrite same ids in auth.json.
+    pub providers: std::collections::HashMap<String, OpenCodeProviderAuthEntryDto>,
+}
+
+fn opencode_user_data_dir() -> PathBuf {
+    if let Ok(dir) = std::env::var("OPENCODE_DATA_DIR") {
+        let trimmed = dir.trim();
+        if !trimmed.is_empty() {
+            return PathBuf::from(trimmed);
+        }
+    }
+    if let Ok(xdg) = std::env::var("XDG_DATA_HOME") {
+        let trimmed = xdg.trim();
+        if !trimmed.is_empty() {
+            return PathBuf::from(trimmed).join("opencode");
+        }
+    }
+    dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".local")
+        .join("share")
+        .join("opencode")
+}
+
+/// Write org provider API keys to a separate file (skills-org-auth.json).
+/// Does not overwrite personal auth.json — OpenCode prefers personal keys, then falls back to org shared.
+#[tauri::command]
+pub async fn sync_opencode_provider_auth(
+    auth: OpenCodeProviderAuthDto,
+) -> Result<String, AppError> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut org_map = serde_json::Map::new();
+        let mut org_ids: Vec<String> = Vec::new();
+        for (provider_id, entry) in &auth.providers {
+            let id = provider_id.trim();
+            if id.is_empty() {
+                continue;
+            }
+            let key = entry.key.trim();
+            if key.is_empty() {
+                continue;
+            }
+            let cred_type = if entry.cred_type.trim().is_empty() {
+                "api".to_string()
+            } else {
+                entry.cred_type.trim().to_string()
+            };
+            org_map.insert(
+                id.to_string(),
+                serde_json::json!({
+                    "type": cred_type,
+                    "key": key,
+                }),
+            );
+            org_ids.push(id.to_string());
+        }
+
+        let body = serde_json::json!({
+            "providers": org_map,
+            "updated_by": "skills-manager",
+        });
+        let text = serde_json::to_string_pretty(&body)
+            .map_err(|e| AppError::internal(format!("serialize org auth failed: {e}")))?;
+
+        let mut written: Vec<String> = Vec::new();
+        let auth_paths = [
+            opencode_user_data_dir().join("skills-org-auth.json"),
+            opencode_user_config_dir().join("skills-org-auth.json"),
+            opencode_managed_config_dir().join("skills-org-auth.json"),
+        ];
+        for path in &auth_paths {
+            if let Some(parent) = path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            if std::fs::write(path, &text).is_ok() {
+                written.push(path.display().to_string());
+            }
+        }
+        if written.is_empty() {
+            return Err(AppError::io("failed to write skills-org-auth.json".to_string()));
+        }
+
+        // Marker for UI「共享」badge (provider ids only, no secrets).
+        let marker = serde_json::json!({
+            "provider_ids": org_ids,
+            "updated_by": "skills-manager",
+        });
+        let marker_text = serde_json::to_string_pretty(&marker)
+            .map_err(|e| AppError::internal(format!("serialize org providers marker failed: {e}")))?;
+        for marker_path in [
+            opencode_user_config_dir().join("skills-org-providers.json"),
+            opencode_managed_config_dir().join("skills-org-providers.json"),
+            opencode_user_data_dir().join("skills-org-providers.json"),
+        ] {
+            if let Some(parent) = marker_path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            let _ = std::fs::write(&marker_path, &marker_text);
+        }
+
+        Ok(format!(
+            "{} ({} shared providers)",
+            written.join("; "),
+            org_ids.len()
+        ))
+    })
+    .await
+    .map_err(|e| AppError::io(format!("join error: {e}")))?
+}

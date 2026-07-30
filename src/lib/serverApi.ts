@@ -387,6 +387,36 @@ export async function updateServerModelPolicy(
   }
 }
 
+export interface ServerProviderCredentials {
+  providers: Record<string, { type?: string; key?: string }>;
+}
+
+export async function fetchServerProviderCredentials(
+  baseUrl: string,
+  token: string
+): Promise<ServerProviderCredentials> {
+  return serverRequest<ServerProviderCredentials>(
+    normalizeBaseUrl(baseUrl),
+    token,
+    "GET",
+    "/api/v1/server/provider-credentials"
+  );
+}
+
+export async function updateServerProviderCredentials(
+  baseUrl: string,
+  token: string,
+  providers: Record<string, { type: string; key: string }>
+): Promise<ServerProviderCredentials> {
+  return serverRequest<ServerProviderCredentials>(
+    normalizeBaseUrl(baseUrl),
+    token,
+    "POST",
+    "/api/v1/server/provider-credentials",
+    { providers }
+  );
+}
+
 export async function serverRequest<T>(
   baseUrl: string,
   token: string,

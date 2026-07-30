@@ -31,6 +31,7 @@ import { decode64 } from "@/utils/base64"
 import { handleDocumentSearchKeydown } from "@/utils/search-keydown"
 import { createEventListener } from "@solid-primitives/event-listener"
 import { matchesModelSearch } from "./dialog-select-model-search"
+import { useSkillsOrgProviders } from "@/utils/skills-org-providers"
 
 const isFree = (provider: string, cost: { input: number } | undefined) =>
   provider === "opencode" && (!cost || cost.input === 0)
@@ -245,6 +246,7 @@ export function ModelSelectorPopoverV2(props: {
   const model = props.model ?? useLocal().model
   const language = useLanguage()
   const dialog = useDialog()
+  const orgProviders = useSkillsOrgProviders()
   const [store, setStore] = createStore({ open: false, search: "", active: "" })
   let searchRef: HTMLInputElement | undefined
   let contentRef: HTMLDivElement | undefined
@@ -444,6 +446,9 @@ export function ModelSelectorPopoverV2(props: {
                     <MenuV2.Group>
                       <MenuV2.GroupLabel class="gap-2 px-3">
                         <span class="min-w-0 truncate">{group.items[0].provider.name}</span>
+                        <Show when={orgProviders.isShared(group.items[0].provider.id)}>
+                          <TagV2 class="shrink-0">{language.t("model.tag.shared")}</TagV2>
+                        </Show>
                       </MenuV2.GroupLabel>
                       <MenuV2.RadioGroup value={current()}>
                         <For each={group.items}>
@@ -475,6 +480,9 @@ export function ModelSelectorPopoverV2(props: {
                                 onSelect={() => selectModel(item)}
                               >
                                 <span class="min-w-0 truncate leading-5">{item.name}</span>
+                                <Show when={orgProviders.isShared(item.provider.id)}>
+                                  <TagV2 class="shrink-0">{language.t("model.tag.shared")}</TagV2>
+                                </Show>
                                 <Show when={isFree(item.provider.id, item.cost)}>
                                   <TagV2 class="shrink-0">{language.t("model.tag.free")}</TagV2>
                                 </Show>

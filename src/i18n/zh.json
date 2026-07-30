@@ -77,6 +77,7 @@
     "tabRoles": "角色",
     "tabUsers": "用户",
     "tabPolicy": "模型策略",
+    "tabCredentials": "模型密钥",
     "policy": {
       "title": "OpenCode 模型策略",
       "subtitle": "控制千问视觉等模型是否仅限需求工作台使用。修改后客户端登录或打开 OpenCode 时自动下发。",
@@ -91,6 +92,18 @@
       "save": "保存策略",
       "saved": "模型策略已保存",
       "opsOnly": "仅运维（ops）可修改模型策略"
+    },
+    "credentials": {
+      "title": "OpenCode 模型密钥",
+      "subtitle": "由 ops 统一配置组织级 API Key。下发后模型列表显示「共享」；用户仍可通过「自定义提供商」配置自己的密钥并自定义显示名称，两者可同时出现。",
+      "providerId": "Provider ID",
+      "apiKey": "API Key",
+      "add": "添加 Provider",
+      "remove": "删除",
+      "save": "保存并下发",
+      "saved": "模型密钥已保存并同步到本机",
+      "opsOnly": "仅运维（ops）可修改模型密钥",
+      "hint": "常用 ID：alibaba-cn、deepseek。留空 Key 表示不下发。组织密钥单独存放，不覆盖个人配置。个人请用自定义提供商设显示名称，与共享条目共存显示。"
     },
     "users": {
       "create": "新建用户",
@@ -812,7 +825,7 @@
     "signedInAs": "当前账号",
     "help": "帮助",
     "about": "关于",
-    "version": "芯宏Skills仓库 V1.4.2",
+    "version": "芯宏Skills仓库 V1.4.3",
     "tagline": "跨平台。极简、高效、无感多组合切换。",
     "checkUpdate": "检查更新",
     "checking": "检查中…",

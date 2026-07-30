@@ -11,6 +11,7 @@ import { BackgroundJob } from "@/background/job"
 import { Command } from "@/command"
 import { Config } from "@/config/config"
 import { SkillsModelPolicy } from "@/config/model-policy"
+import { SkillsOrgProviders } from "@/config/org-providers"
 import { Workspace } from "@/control-plane/workspace"
 import { Env } from "@/env"
 import { EventV2Bridge } from "@/event-v2-bridge"
@@ -204,6 +205,17 @@ const skillsModelPolicyRoute = HttpRouter.use((router) =>
   ),
 ).pipe(Layer.provide(authOnlyRouterLayer))
 
+const skillsOrgProvidersRoute = HttpRouter.use((router) =>
+  router.add("GET", "/skills/org-providers", () =>
+    Effect.sync(() => {
+      const info = SkillsOrgProviders.current()
+      return HttpServerResponse.jsonUnsafe({
+        provider_ids: info.providerIds,
+      })
+    }),
+  ),
+).pipe(Layer.provide(authOnlyRouterLayer))
+
 const uiRoute = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const fs = yield* FSUtil.Service
@@ -294,6 +306,7 @@ export function createRoutes(
     serverRoutes,
     docRoute,
     skillsModelPolicyRoute,
+    skillsOrgProvidersRoute,
     uiRoute,
   ).pipe(
     Layer.provide([

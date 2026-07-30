@@ -6,6 +6,7 @@ import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
 import { SelectV2 } from "@opencode-ai/ui/v2/select-v2"
 import { TextInputV2 } from "@opencode-ai/ui/v2/text-input-v2"
+import { useDirectoryPicker } from "@/components/directory-picker"
 import { attachmentMime } from "@/components/prompt-input/files"
 import { ACCEPTED_IMAGE_TYPES } from "@/constants/file-picker"
 import { useLanguage } from "@/context/language"
@@ -378,6 +379,7 @@ export function RequirementsEditorPage() {
   const settings = useSettings()
   const tabs = useTabs()
   const platform = usePlatform()
+  const pickDirectory = useDirectoryPicker()
   const [previewId, setPreviewId] = createSignal<string>()
   const [selectedIds, setSelectedIds] = createSignal<Set<string>>(new Set())
   const [chatAssetIds, setChatAssetIds] = createSignal<Set<string>>(new Set())
@@ -720,18 +722,47 @@ export function RequirementsEditorPage() {
 
   const systemOptions = createMemo(() => {
     const map = new Map<string, { directory: string; name: string }>()
+    const push = (directory: string, name: string) => {
+      if (!directory || map.has(directory)) return
+      map.set(directory, { directory, name })
+    }
+    const last = server.projects.last()
+    if (last) push(last, last.split(/[/\\]/).filter(Boolean).at(-1) ?? last)
+    for (const closed of server.projects.recentlyClosed()) {
+      push(closed, closed.split(/[/\\]/).filter(Boolean).at(-1) ?? closed)
+    }
     for (const item of layout.projects.list()) {
-      map.set(item.worktree, { directory: item.worktree, name: displayName(item) })
+      push(item.worktree, displayName(item))
     }
     const current = project()
-    if (current?.systemDirectory && !map.has(current.systemDirectory)) {
-      map.set(current.systemDirectory, {
-        directory: current.systemDirectory,
-        name: current.systemName || current.systemDirectory,
-      })
+    if (current?.systemDirectory) {
+      push(current.systemDirectory, current.systemName || current.systemDirectory)
     }
     return [...map.values()]
   })
+
+  const bindLinkedProject = (directory: string, name: string) => {
+    const id = project()?.id
+    if (!id) return
+    requirements.setSystem(id, { directory, name })
+    layout.projects.open(directory)
+    server.projects.touch(directory)
+  }
+
+  const browseLinkedProject = () => {
+    const conn = server.current
+    if (!conn) return
+    pickDirectory({
+      server: conn,
+      title: language.t("requirements.field.browseProject"),
+      onSelect: (result) => {
+        const directory = Array.isArray(result) ? result[0] : result
+        if (!directory) return
+        const name = directory.split(/[/\\]/).filter(Boolean).at(-1) ?? directory
+        bindLinkedProject(directory, name)
+      },
+    })
+  }
 
   return (
     <Show
@@ -768,25 +799,34 @@ export function RequirementsEditorPage() {
               <IconV2 name="chevron-down" size="small" style={{ transform: "rotate(90deg)" }} />
               {language.t("requirements.action.backToList")}
             </A>
-            <label data-component="requirements-editor-field" data-grow>
-              <span>{language.t("requirements.field.title")}</span>
+            <div data-component="requirements-editor-title">
               <TextInputV2
                 value={current().title}
                 onInput={(event) => requirements.rename(current().id, event.currentTarget.value)}
                 placeholder={language.t("requirements.field.title")}
+                aria-label={language.t("requirements.field.title")}
               />
-            </label>
-            <label data-component="requirements-editor-field" data-project>
-              <span>{language.t("requirements.field.linkedProject")}</span>
+            </div>
+            <div
+              data-component="requirements-editor-project"
+              title={
+                current().systemDirectory
+                  ? current().systemDirectory
+                  : language.t("requirements.editor.needLinkedProject")
+              }
+              data-missing={!current().systemDirectory || undefined}
+            >
+              <IconV2 name="folder" size="small" />
               <Show
                 when={systemOptions().length > 0 || current().systemDirectory}
                 fallback={
-                  <div data-component="requirements-editor-project-empty">
+                  <span data-component="requirements-editor-project-empty">
                     {language.t("requirements.editor.noOpenProjects")}
-                  </div>
+                  </span>
                 }
               >
                 <SelectV2
+                  appearance="inline"
                   options={systemOptions()}
                   current={
                     systemOptions().find((item) => item.directory === current().systemDirectory) ??
@@ -805,21 +845,20 @@ export function RequirementsEditorPage() {
                       requirements.setSystem(current().id, undefined)
                       return
                     }
-                    requirements.setSystem(current().id, { directory: item.directory, name: item.name })
+                    bindLinkedProject(item.directory, item.name)
                   }}
                 />
               </Show>
-              <Show when={current().systemDirectory}>
-                <span data-component="requirements-editor-project-path" title={current().systemDirectory}>
-                  {current().systemDirectory}
-                </span>
-              </Show>
-              <Show when={!current().systemDirectory}>
-                <span data-component="requirements-editor-project-hint">
-                  {language.t("requirements.editor.needLinkedProject")}
-                </span>
-              </Show>
-            </label>
+              <ButtonV2
+                size="small"
+                variant="ghost"
+                data-component="requirements-editor-project-browse"
+                onClick={browseLinkedProject}
+                title={language.t("requirements.field.browseProject")}
+              >
+                {language.t("requirements.field.browseProject")}
+              </ButtonV2>
+            </div>
           </header>
           <Show when={dragging()}>
             <div data-component="requirements-drop-banner" class="mt-2">

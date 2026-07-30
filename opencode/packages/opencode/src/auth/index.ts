@@ -4,10 +4,19 @@ import { Effect, Layer, Record, Result, Schema, Context } from "effect"
 import { NonNegativeInt } from "@opencode-ai/core/schema"
 import { Global } from "@opencode-ai/core/global"
 import { FSUtil } from "@opencode-ai/core/fs-util"
+import { ConfigManaged } from "@/config/managed"
 
 export const OAUTH_DUMMY_KEY = "opencode-oauth-dummy-key"
 
-const file = path.join(Global.Path.data, "auth.json")
+const personalFile = path.join(Global.Path.data, "auth.json")
+
+function orgAuthPaths() {
+  return [
+    path.join(ConfigManaged.managedConfigDir(), "skills-org-auth.json"),
+    path.join(Global.Path.config, "skills-org-auth.json"),
+    path.join(Global.Path.data, "skills-org-auth.json"),
+  ]
+}
 
 const fail = (message: string) => (cause: unknown) => new AuthError({ message, cause })
 
@@ -55,15 +64,51 @@ const layer = Layer.effect(
     const fsys = yield* FSUtil.Service
     const decode = Schema.decodeUnknownOption(Info)
 
-    const all = Effect.fn("Auth.all")(function* () {
+    const decodeMap = (data: Record<string, unknown>) =>
+      Record.filterMap(data, (value) => Result.fromOption(decode(value), () => undefined))
+
+    /** Personal keys only — never includes org-shared credentials. */
+    const personal = Effect.fn("Auth.personal")(function* () {
       if (process.env.OPENCODE_AUTH_CONTENT) {
         try {
-          return JSON.parse(process.env.OPENCODE_AUTH_CONTENT)
-        } catch (err) {}
+          return decodeMap(JSON.parse(process.env.OPENCODE_AUTH_CONTENT) as Record<string, unknown>)
+        } catch {
+          // fall through to file
+        }
       }
+      const data = (yield* fsys.readJson(personalFile).pipe(Effect.orElseSucceed(() => ({})))) as Record<
+        string,
+        unknown
+      >
+      return decodeMap(data)
+    })
 
-      const data = (yield* fsys.readJson(file).pipe(Effect.orElseSucceed(() => ({})))) as Record<string, unknown>
-      return Record.filterMap(data, (value) => Result.fromOption(decode(value), () => undefined))
+    /** Org-shared keys from Skills Manager (separate file; does not overwrite personal). */
+    const org = Effect.fn("Auth.org")(function* () {
+      for (const file of orgAuthPaths()) {
+        const data = yield* fsys.readJson(file).pipe(Effect.orElseSucceed(() => null))
+        if (!data || typeof data !== "object" || Array.isArray(data)) continue
+        const root = data as Record<string, unknown>
+        const providers =
+          root.providers && typeof root.providers === "object" && !Array.isArray(root.providers)
+            ? (root.providers as Record<string, unknown>)
+            : root
+        const decoded = decodeMap(providers)
+        if (Object.keys(decoded).length > 0) return decoded
+      }
+      return {} as Record<string, Info>
+    })
+
+    /**
+     * Merged credentials for runtime.
+     * Org shared and personal custom providers coexist in the model list.
+     * Prefer a custom provider (with your own display name) for personal keys;
+     * if the same provider id has both, personal key is used for that id.
+     */
+    const all = Effect.fn("Auth.all")(function* () {
+      const shared = yield* org()
+      const own = yield* personal()
+      return { ...shared, ...own }
     })
 
     const get = Effect.fn("Auth.get")(function* (providerID: string) {
@@ -72,20 +117,20 @@ const layer = Layer.effect(
 
     const set = Effect.fn("Auth.set")(function* (key: string, info: Info) {
       const norm = key.replace(/\/+$/, "")
-      const data = yield* all()
+      const data = yield* personal()
       if (norm !== key) delete data[key]
       delete data[norm + "/"]
       yield* fsys
-        .writeJson(file, { ...data, [norm]: info }, 0o600)
+        .writeJson(personalFile, { ...data, [norm]: info }, 0o600)
         .pipe(Effect.mapError(fail("Failed to write auth data")))
     })
 
     const remove = Effect.fn("Auth.remove")(function* (key: string) {
       const norm = key.replace(/\/+$/, "")
-      const data = yield* all()
+      const data = yield* personal()
       delete data[key]
       delete data[norm]
-      yield* fsys.writeJson(file, data, 0o600).pipe(Effect.mapError(fail("Failed to write auth data")))
+      yield* fsys.writeJson(personalFile, data, 0o600).pipe(Effect.mapError(fail("Failed to write auth data")))
     })
 
     return Service.of({ get, all, set, remove })

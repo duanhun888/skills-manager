@@ -8,6 +8,8 @@ export const PUBLIC_UI_PATHS = new Set<string>([
   // Org model policy is written by Skills Manager to a local file; the desktop
   // UI polls this without Basic credentials. Not a secret — just mode + model ids.
   "/skills/model-policy",
+  // Org-shared provider IDs for「共享」badges in the model picker (not secrets).
+  "/skills/org-providers",
 ])
 
 export function isPublicUIPath(method: string, pathname: string) {
