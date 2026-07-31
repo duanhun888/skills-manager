@@ -331,6 +331,8 @@ pub struct ServerPublicConfigDto {
     pub model_policy_mode: String,
     #[serde(default)]
     pub requirements_only_models: Vec<String>,
+    #[serde(default)]
+    pub coding_vision_model: Option<String>,
 }
 
 fn default_model_policy_mode() -> String {

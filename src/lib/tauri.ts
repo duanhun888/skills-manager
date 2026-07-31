@@ -266,6 +266,7 @@ export const openOpenCodeEditor = (projectPath?: string | null) =>
 export interface OpenCodeModelPolicy {
   mode: string;
   requirements_only_models: string[];
+  coding_vision_model?: string | null;
 }
 
 export const syncOpenCodeModelPolicy = (policy: OpenCodeModelPolicy) =>
@@ -296,6 +297,7 @@ export async function syncOpenCodeModelPolicyFromServer(
     await syncOpenCodeModelPolicy({
       mode: cfg.model_policy_mode === "restricted" ? "restricted" : "open",
       requirements_only_models: cfg.requirements_only_models ?? [],
+      coding_vision_model: cfg.coding_vision_model?.trim() || null,
     });
   } catch {
     // Offline / no server — leave existing local policy file untouched.

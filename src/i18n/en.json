@@ -88,6 +88,8 @@
       "models": "Requirements-only models",
       "modelsHint": "One per line. Prefer the real ID from OpenCode → Manage models (often alibaba-cn/qwen3.7-plus, not the display name). A bare model id like qwen3.7-plus also works. Sync expands alibaba / alibaba-cn / opencode aliases.",
       "modelsRequired": "Add at least one model in restricted mode",
+      "codingVision": "Coding vision model",
+      "codingVisionHint": "Optional. When coding chat has images and the selected model cannot see them, describe with this vision model first, then continue with the user’s coding model. Use a real ID such as alibaba-cn/qwen3-vl-plus. Leave empty to disable.",
       "save": "Save policy",
       "saved": "Model policy saved",
       "opsOnly": "Only ops can change model policy"
@@ -824,7 +826,7 @@
     "signedInAs": "Signed in as",
     "help": "Help",
     "about": "About",
-    "version": "芯宏Skills仓库 V1.4.7",
+    "version": "芯宏Skills仓库 V1.4.8",
     "tagline": "Cross-platform. Minimal, efficient, seamless multi-set switching.",
     "checkUpdate": "Check for Updates",
     "checking": "Checking…",

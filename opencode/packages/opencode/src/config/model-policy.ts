@@ -10,6 +10,7 @@ export type Mode = "open" | "restricted"
 export type Info = {
   mode: Mode
   requirementsOnlyModels: string[]
+  codingVisionModel?: string
 }
 
 const DEFAULT: Info = {
@@ -97,7 +98,13 @@ function parse(raw: unknown): Info {
         .map((item) => item.trim())
         .filter(Boolean)
     : []
-  return { mode, requirementsOnlyModels: models }
+  const codingVision =
+    typeof obj.coding_vision_model === "string" ? obj.coding_vision_model.trim() : ""
+  return {
+    mode,
+    requirementsOnlyModels: models,
+    codingVisionModel: codingVision || undefined,
+  }
 }
 
 function loadFromDisk(): { path: string; mtimeMs: number; info: Info } | undefined {

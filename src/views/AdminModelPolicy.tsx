@@ -31,6 +31,7 @@ export function AdminModelPolicy() {
   const [saving, setSaving] = useState(false);
   const [mode, setMode] = useState<PolicyMode>("open");
   const [modelsText, setModelsText] = useState(DEFAULT_MODELS);
+  const [codingVisionModel, setCodingVisionModel] = useState("alibaba-cn/qwen3-vl-plus");
 
   const load = useCallback(async () => {
     if (!serverApiUrl.trim()) return;
@@ -40,6 +41,7 @@ export function AdminModelPolicy() {
       setMode(cfg.model_policy_mode === "restricted" ? "restricted" : "open");
       const models = cfg.requirements_only_models ?? [];
       setModelsText(models.length > 0 ? models.join("\n") : DEFAULT_MODELS);
+      setCodingVisionModel(cfg.coding_vision_model?.trim() || "");
     } catch (err) {
       toast.error(getErrorMessage(err, t("common.error")));
     } finally {
@@ -66,10 +68,12 @@ export function AdminModelPolicy() {
       const cfg = await updateServerModelPolicy(serverApiUrl, token, {
         mode,
         requirements_only_models: models,
+        coding_vision_model: codingVisionModel.trim(),
       });
       await syncOpenCodeModelPolicy({
         mode: cfg.model_policy_mode === "restricted" ? "restricted" : "open",
         requirements_only_models: cfg.requirements_only_models ?? models,
+        coding_vision_model: cfg.coding_vision_model?.trim() || codingVisionModel.trim() || null,
       });
       toast.success(t("admin.policy.saved"));
       await load();
@@ -149,6 +153,22 @@ export function AdminModelPolicy() {
           className="w-full min-h-[120px] rounded-md border border-border bg-surface px-3 py-2 text-sm font-mono"
           value={modelsText}
           onChange={(e) => setModelsText(e.target.value)}
+          spellCheck={false}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-secondary" htmlFor="coding-vision-model">
+          {t("admin.policy.codingVision")}
+        </label>
+        <p className="text-[13px] text-tertiary">{t("admin.policy.codingVisionHint")}</p>
+        <input
+          id="coding-vision-model"
+          type="text"
+          className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm font-mono"
+          value={codingVisionModel}
+          onChange={(e) => setCodingVisionModel(e.target.value)}
+          placeholder="alibaba-cn/qwen3-vl-plus"
           spellCheck={false}
         />
       </div>

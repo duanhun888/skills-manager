@@ -64,6 +64,11 @@ import { setCursorPosition } from "@/components/prompt-input/editor-dom"
 import { promptLength } from "@/components/prompt-input/history"
 import { type FollowupDraft, sendFollowupDraft } from "@/components/prompt-input/submit"
 import {
+  modelSupportsImages,
+  parseProviderModel,
+  useSkillsModelPolicy,
+} from "@/utils/skills-model-policy"
+import {
   createPromptInputController,
   createSessionComposerController,
   createSessionComposerRegionController,
@@ -367,6 +372,7 @@ export default function Page() {
   const comments = useComments()
   const command = useCommand()
   const terminal = useTerminal()
+  const skillsPolicy = useSkillsModelPolicy()
   const [searchParams, setSearchParams] = useSearchParams<{ prompt?: string }>()
   const location = useLocation()
   const navigate = useNavigate()
@@ -1792,6 +1798,23 @@ export default function Page() {
         serverSync: serverSync(),
         draft: item,
         optimisticBusy: item.sessionDirectory === sdk().directory,
+        vision: (() => {
+          const visionModel = parseProviderModel(skillsPolicy.policy().coding_vision_model)
+          if (!visionModel) return undefined
+          const provider = sync().data.provider.all.get(item.model.providerID)
+          const modelInfo = provider?.models?.[item.model.modelID]
+          return {
+            visionModel,
+            codingSupportsImages: modelSupportsImages(modelInfo),
+            locale: language.locale(),
+            onDescribeStart: () => {
+              showToast({
+                title: language.t("prompt.toast.visionDescribe.title"),
+                description: language.t("prompt.toast.visionDescribe.description"),
+              })
+            },
+          }
+        })(),
       }).catch((err) => {
         setFollowup("failed", input.sessionID, input.id)
         fail(err)

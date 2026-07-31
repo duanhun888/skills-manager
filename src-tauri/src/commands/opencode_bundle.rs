@@ -379,6 +379,8 @@ pub struct OpenCodeModelPolicyDto {
     pub mode: String,
     #[serde(default)]
     pub requirements_only_models: Vec<String>,
+    #[serde(default)]
+    pub coding_vision_model: Option<String>,
 }
 
 fn opencode_user_config_dir() -> PathBuf {
@@ -470,9 +472,15 @@ fn write_policy_file(dir: &Path, policy: &OpenCodeModelPolicyDto) -> Result<(), 
         _ => "open",
     };
     let models = expand_requirements_only_models(&policy.requirements_only_models);
+    let coding_vision = policy
+        .coding_vision_model
+        .as_deref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty());
     let body = serde_json::json!({
         "mode": mode,
         "requirements_only_models": models,
+        "coding_vision_model": coding_vision,
         "updated_by": "skills-manager",
     });
     let text = serde_json::to_string_pretty(&body)

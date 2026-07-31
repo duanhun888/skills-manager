@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.4.8] - 2026-07-31
+
+### Release Overview
+- Coding chat auto-describes attached images with an org-configured vision model, then continues with the selected coding model
+
+### User-facing
+- When a message has images and the selected coding model cannot see them, the app first runs the org vision model (with chat context) and then answers with your coding model; no manual model switching
+- Queued follow-ups with images also go through the vision describe pass
+- New admin field 模型策略 → 编码区识图模型 (e.g. `alibaba-cn/qwen3-vl-plus`); leave empty to keep current behavior
+
+### Developer & Governance
+- Central server policy JSON gains optional `coding_vision_model` (read/write/public config); no migration, old clients unaffected
+- Vision pass uses the `requirements` agent to bypass restricted-mode coding checks; orchestration lives in `sendFollowupDraft`
+
 ## [1.4.7] - 2026-07-30
 
 ### Release Overview

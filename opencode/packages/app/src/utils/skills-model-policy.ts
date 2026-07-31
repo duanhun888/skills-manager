@@ -4,6 +4,7 @@ import { useServer } from "@/context/server"
 export type SkillsModelPolicy = {
   mode: "open" | "restricted"
   requirements_only_models: string[]
+  coding_vision_model?: string
 }
 
 const OPEN: SkillsModelPolicy = { mode: "open", requirements_only_models: [] }
@@ -14,7 +15,7 @@ let lastGood: SkillsModelPolicy = OPEN
 let lastFingerprint = fingerprint(OPEN)
 
 function fingerprint(data: SkillsModelPolicy) {
-  return `${data.mode}|${data.requirements_only_models.join("\n")}`
+  return `${data.mode}|${data.requirements_only_models.join("\n")}|${data.coding_vision_model ?? ""}`
 }
 
 function normalizeKey(providerID: string, modelID: string) {
@@ -57,12 +58,37 @@ export function entryMatches(entry: string, providerID: string, modelID: string)
   return normalizeModelToken(entryModel) === normalizeModelToken(modelID)
 }
 
-function parsePolicy(data: Partial<SkillsModelPolicy>): SkillsModelPolicy {
+/** Parse `provider/model` or bare model id into provider/model parts. */
+export function parseProviderModel(raw: string | undefined | null): { providerID: string; modelID: string } | undefined {
+  const entry = raw?.trim()
+  if (!entry) return undefined
+  const slash = entry.indexOf("/")
+  if (slash <= 0 || slash >= entry.length - 1) return undefined
+  return {
+    providerID: entry.slice(0, slash).trim(),
+    modelID: entry.slice(slash + 1).trim(),
+  }
+}
+
+export function modelSupportsImages(item: {
+  modalities?: { input?: string[] }
+  capabilities?: { input?: { image?: boolean } }
+} | undefined) {
+  if (!item) return false
+  if (item.capabilities?.input?.image) return true
+  const modalities = item.modalities?.input
+  return Array.isArray(modalities) && modalities.includes("image")
+}
+
+function parsePolicy(data: Partial<SkillsModelPolicy> & { coding_vision_model?: string | null }): SkillsModelPolicy {
+  const vision =
+    typeof data.coding_vision_model === "string" ? data.coding_vision_model.trim() : ""
   return {
     mode: data.mode === "restricted" ? "restricted" : "open",
     requirements_only_models: Array.isArray(data.requirements_only_models)
       ? data.requirements_only_models.filter((x): x is string => typeof x === "string")
       : [],
+    coding_vision_model: vision || undefined,
   }
 }
 

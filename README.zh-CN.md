@@ -2,7 +2,10 @@
 
 组织统一的 AI Agent Skills 管理平台。
 
-**使用手册：** [`docs/芯宏Skills仓库-使用手册.md`](docs/芯宏Skills仓库-使用手册.md)
+**使用手册：**
+
+- Skills 客户端：[`docs/芯宏Skills仓库-使用手册.md`](docs/芯宏Skills仓库-使用手册.md)
+- OpenCode（需求 / 编码）：[`docs/OpenCode-使用手册.md`](docs/OpenCode-使用手册.md)
 
 ## 功能概览
 
@@ -21,7 +24,7 @@
 3. 在 **我的技能库** 管理、上传中央、同步 Agent。
 4. 在 **各 Agent** 或 **各项目** 使 Skill 生效。
 
-详细步骤见 [使用手册](docs/芯宏Skills仓库-使用手册.md)。
+详细步骤见 [Skills 使用手册](docs/芯宏Skills仓库-使用手册.md)、[OpenCode 使用手册](docs/OpenCode-使用手册.md)。
 
 ## 中央服务器与 OBS 存储
 

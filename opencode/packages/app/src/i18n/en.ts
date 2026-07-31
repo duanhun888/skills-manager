@@ -313,6 +313,10 @@ export const dict = {
   "prompt.toast.commandSendFailed.title": "Failed to send command",
   "prompt.toast.promptSendFailed.title": "Failed to send prompt",
   "prompt.toast.promptSendFailed.description": "Unable to retrieve session",
+  "prompt.toast.visionDescribe.title": "Reading screenshot…",
+  "prompt.toast.visionDescribe.description": "Using the org vision model with chat context, then continuing with your coding model.",
+  "prompt.toast.visionDescribeFailed.title": "Screenshot describe failed",
+  "prompt.toast.visionDescribeFailed.description": "Could not describe the image. Check the coding vision model in Skills admin, or switch to a vision model yourself.",
 
   "dialog.mcp.title": "MCPs",
   "dialog.mcp.description": "{{enabled}} of {{total}} enabled",

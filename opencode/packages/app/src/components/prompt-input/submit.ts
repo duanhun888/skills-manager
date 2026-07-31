@@ -16,10 +16,25 @@ import { useSync, type DirectorySync } from "@/context/sync"
 import { Identifier } from "@/utils/id"
 import { Worktree as WorktreeState } from "@/utils/worktree"
 import { buildRequestParts } from "./build-request-parts"
+import {
+  VISION_DESCRIBE_SYSTEM,
+  buildCodingFollowupText,
+  buildVisionDescribeUserText,
+  collectAssistantText,
+} from "./coding-vision"
 import { setCursorPosition } from "./editor-dom"
 import { formatServerError } from "@/utils/server-errors"
 import { ScopedKey } from "@/utils/server-scope"
 import { createPromptSubmissionState } from "./submission-state"
+import {
+  modelSupportsImages,
+  parseProviderModel,
+  useSkillsModelPolicy,
+} from "@/utils/skills-model-policy"
+
+function textPrompt(content: string): Prompt {
+  return [{ type: "text", content, start: 0, end: content.length }]
+}
 
 type PendingPrompt = {
   abort: AbortController
@@ -38,6 +53,14 @@ export type FollowupDraft = {
   variant?: string
 }
 
+export type FollowupVisionDescribe = {
+  visionModel: { providerID: string; modelID: string }
+  /** When true, skip two-pass (coding model can see images). */
+  codingSupportsImages: boolean
+  locale: string
+  onDescribeStart?: () => void
+}
+
 type FollowupSendInput = {
   client: DirectorySDK["client"]
   serverSync: ServerSync
@@ -46,11 +69,61 @@ type FollowupSendInput = {
   messageID?: string
   optimisticBusy?: boolean
   before?: () => Promise<boolean> | boolean
+  /** When set and draft has images, describe with vision model then continue without images. */
+  vision?: FollowupVisionDescribe
 }
 
 const draftText = (prompt: Prompt) => prompt.map((part) => ("content" in part ? part.content : "")).join("")
 
 const draftImages = (prompt: Prompt) => prompt.filter((part): part is ImageAttachmentPart => part.type === "image")
+
+async function resolveVisionDescription(input: {
+  client: DirectorySDK["client"]
+  draft: FollowupDraft
+  images: ImageAttachmentPart[]
+  text: string
+  vision: FollowupVisionDescribe
+}) {
+  const visionMessageID = Identifier.ascending("message")
+  const visionText = buildVisionDescribeUserText(input.text, input.vision.locale)
+  const { requestParts } = buildRequestParts({
+    prompt: input.draft.prompt,
+    context: input.draft.context,
+    images: input.images,
+    text: visionText,
+    sessionID: input.draft.sessionID,
+    messageID: visionMessageID,
+    sessionDirectory: input.draft.sessionDirectory,
+  })
+
+  const visionResult = await input.client.session.prompt({
+    sessionID: input.draft.sessionID,
+    agent: "requirements",
+    model: {
+      providerID: input.vision.visionModel.providerID,
+      modelID: input.vision.visionModel.modelID,
+    },
+    system: VISION_DESCRIBE_SYSTEM,
+    parts: requestParts,
+  })
+
+  let description = collectAssistantText(visionResult.data?.parts)
+  if (!description) {
+    try {
+      const messages = await input.client.session.messages({ sessionID: input.draft.sessionID, limit: 8 })
+      const rows = messages.data ?? []
+      for (let i = rows.length - 1; i >= 0; i--) {
+        const row = rows[i] as { info?: { role?: string }; parts?: unknown }
+        if (row?.info?.role !== "assistant") continue
+        description = collectAssistantText(row.parts)
+        if (description) break
+      }
+    } catch {
+      // keep empty
+    }
+  }
+  return description
+}
 
 export async function sendFollowupDraft(input: FollowupSendInput) {
   const text = draftText(input.draft.prompt)
@@ -73,6 +146,47 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
 
   const [head, ...tail] = text.split(" ")
   const cmd = head?.startsWith("/") ? head.slice(1) : undefined
+  const shouldDescribe =
+    !!input.vision &&
+    !input.vision.codingSupportsImages &&
+    images.length > 0 &&
+    !(cmd && input.sync.data.command.find((item) => item.name === cmd))
+
+  if (shouldDescribe && input.vision) {
+    setBusy()
+    try {
+      if (!(await wait())) {
+        setIdle()
+        return false
+      }
+      input.vision.onDescribeStart?.()
+      const description = await resolveVisionDescription({
+        client: input.client,
+        draft: input.draft,
+        images,
+        text,
+        vision: input.vision,
+      })
+      if (!description) {
+        setIdle()
+        throw new Error("vision describe returned empty")
+      }
+      const codingText = buildCodingFollowupText(text, description, input.vision.locale)
+      return await sendFollowupDraft({
+        ...input,
+        draft: {
+          ...input.draft,
+          prompt: textPrompt(codingText),
+        },
+        vision: undefined,
+        before: undefined,
+      })
+    } catch (err) {
+      setIdle()
+      throw err
+    }
+  }
+
   if (cmd && input.sync.data.command.find((item) => item.name === cmd)) {
     setBusy()
     try {
@@ -204,6 +318,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
   const prompt = input.prompt
   const layout = useLayout()
   const language = useLanguage()
+  const skillsPolicy = useSkillsModelPolicy()
   const params = useParams()
   const [search] = useSearchParams<{ draftId?: string }>()
   const tabs = useTabs()
@@ -512,7 +627,6 @@ export function createPromptSubmit(input: PromptSubmitInput) {
     }
 
     for (const item of commentItems) submission.target().context.remove(item.key)
-    clearInput()
 
     const waitForWorktree = async () => {
       const worktree = WorktreeState.get(sdk().scope, sessionDirectory)
@@ -572,6 +686,24 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       return true
     }
 
+    const visionModel = parseProviderModel(skillsPolicy.policy().coding_vision_model)
+    const vision =
+      mode === "normal" && visionModel && !text.startsWith("/")
+        ? {
+            visionModel,
+            codingSupportsImages: modelSupportsImages(currentModel),
+            locale: language.locale(),
+            onDescribeStart: () => {
+              showToast({
+                title: language.t("prompt.toast.visionDescribe.title"),
+                description: language.t("prompt.toast.visionDescribe.description"),
+              })
+            },
+          }
+        : undefined
+
+    clearInput()
+
     void sendFollowupDraft({
       client,
       sync: sync(),
@@ -580,14 +712,20 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       messageID,
       optimisticBusy: sessionDirectory === projectDirectory,
       before: waitForWorktree,
+      vision,
     }).catch((err) => {
       pending.delete(pendingKey(session.id))
       if (sessionDirectory === projectDirectory) {
         sync().set("session_status", session.id, { type: "idle" })
       }
+      const isVision = !!vision && !vision.codingSupportsImages && images.length > 0
       showToast({
-        title: language.t("prompt.toast.promptSendFailed.title"),
-        description: errorMessage(err),
+        title: language.t(
+          isVision ? "prompt.toast.visionDescribeFailed.title" : "prompt.toast.promptSendFailed.title",
+        ),
+        description: isVision
+          ? errorMessage(err) || language.t("prompt.toast.visionDescribeFailed.description")
+          : errorMessage(err),
       })
       removeOptimisticMessage()
       if (restoreInput()) restoreCommentItems(submission.target(), commentItems)

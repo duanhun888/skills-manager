@@ -89,6 +89,8 @@
       "models": "仅限需求的模型",
       "modelsHint": "每行一个。优先填真实 ID：打开 OpenCode → 管理模型，复制 provider/model（本机常见为 alibaba-cn/qwen3.7-plus，不是界面显示名「Qwen3.7 Plus」）。也可只写模型 ID（如 qwen3.7-plus）。下发时会自动展开 alibaba / alibaba-cn / opencode 别名。",
       "modelsRequired": "限制模式下至少填写一个模型",
+      "codingVision": "编码区识图模型",
+      "codingVisionHint": "可选。编码区附图且当前模型不看图时，先用此视觉模型识图，再切回用户所选编码模型。填写真实 ID，如 alibaba-cn/qwen3-vl-plus。留空则不自动识图。",
       "save": "保存策略",
       "saved": "模型策略已保存",
       "opsOnly": "仅运维（ops）可修改模型策略"
@@ -829,7 +831,7 @@
     "signedInAs": "当前账号",
     "help": "帮助",
     "about": "关于",
-    "version": "芯宏Skills仓库 V1.4.7",
+    "version": "芯宏Skills仓库 V1.4.8",
     "tagline": "跨平台。极简、高效、无感多组合切换。",
     "checkUpdate": "检查更新",
     "checking": "检查中…",

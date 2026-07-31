@@ -200,6 +200,7 @@ const skillsModelPolicyRoute = HttpRouter.use((router) =>
       return HttpServerResponse.jsonUnsafe({
         mode: info.mode,
         requirements_only_models: info.requirementsOnlyModels,
+        coding_vision_model: info.codingVisionModel ?? null,
       })
     }),
   ),
