@@ -60,7 +60,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRENEU5QjBGRUI3NTA0MTUKUldRVkJIWHJENXRPVGJzSmtlYlpUa3ZUbDRBRzhKK0J6NmU2S1BiZXdlYitkc3ZRaUw1NVptMlAK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY3RDdCREVGREQ3RDQ1RTUKUldUbFJYM2Q3NzNYOThMSnVJTkhpQjZwR1VxRkZBWE8rZjYzeHE5MGUwVlU3ME9MWXFpVU1oZEoK",
       "endpoints": [
         "https://github.com/duanhun888/skills-manager/releases/latest/download/latest.json"
       ],
