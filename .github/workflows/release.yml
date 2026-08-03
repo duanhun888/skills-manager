@@ -166,7 +166,9 @@ jobs:
           releaseBody: ${{ steps.changelog.outputs.body }}
           releaseDraft: false
           prerelease: false
-          includeUpdaterJson: true
+          # Matrix jobs race on latest.json; a follow-up job publishes it once.
+          includeUpdaterJson: false
+          updaterJsonPreferNsis: true
           args: --target ${{ matrix.target }}
 
       - name: Verify macOS bundle signature
@@ -184,8 +186,27 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
           codesign -dvvv "$APP_PATH" 2>&1 | grep -E 'Signature|Sealed Resources|Identifier'
 
-  verify-updater-assets:
+  publish-updater-json:
     needs: build
+    runs-on: ubuntu-latest
+    name: Publish updater latest.json
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+
+      - name: Generate and upload latest.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/generate-updater-latest-json.mjs "${{ github.ref_name }}"
+
+  verify-updater-assets:
+    needs: publish-updater-json
     runs-on: ubuntu-latest
     name: Verify updater assets
     steps:
@@ -196,11 +217,13 @@ jobs:
           set -euo pipefail
           TAG="${{ github.ref_name }}"
           echo "Checking updater manifest on ${TAG}…"
-          # Wait briefly for GitHub to index the just-uploaded asset.
-          for i in 1 2 3 4 5; do
+          for i in 1 2 3 4 5 6 7 8; do
             if gh release view "$TAG" --repo "${{ github.repository }}" --json assets \
               --jq '.assets[].name' | grep -qx 'latest.json'; then
               echo "Found latest.json on ${TAG}"
+              gh release download "$TAG" --repo "${{ github.repository }}" --pattern 'latest.json' --clobber
+              echo "---- latest.json ----"
+              cat latest.json
               exit 0
             fi
             echo "Attempt ${i}: latest.json not listed yet, retrying…"
