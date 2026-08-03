@@ -158,8 +158,10 @@ jobs:
           # Ad-hoc sign macOS bundles so Gatekeeper reports "unverified developer"
           # (dismissable via right-click → Open) instead of "app is damaged".
           APPLE_SIGNING_IDENTITY: ${{ startsWith(matrix.platform, 'macos') && '-' || '' }}
+          # Key was generated without a password. Do NOT set
+          # TAURI_SIGNING_PRIVATE_KEY_PASSWORD (even to empty) — an empty env
+          # value makes the signer report "Wrong password for that key".
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: v__VERSION__
           releaseName: '芯宏Skills仓库 v__VERSION__'
