@@ -1,6 +1,7 @@
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { terminateOpenCodeEditors } from "./tauri";
 
 export const APP_RELEASES_URL =
   "https://github.com/duanhun888/skills-manager/releases/latest";
@@ -11,6 +12,13 @@ export async function checkAppUpdate(): Promise<Update | null> {
 }
 
 export async function installAppUpdateAndRelaunch(update: Update): Promise<void> {
+  // OpenCode is a separate process; leave it running and Skills "relaunch"
+  // alone keeps the old OpenCode session (stale policy / old UI) until quit.
+  try {
+    await terminateOpenCodeEditors();
+  } catch {
+    // Best-effort — continue with Skills update even if kill fails.
+  }
   await update.downloadAndInstall();
   await relaunch();
 }

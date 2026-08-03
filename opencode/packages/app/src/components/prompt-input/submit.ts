@@ -688,11 +688,24 @@ export function createPromptSubmit(input: PromptSubmitInput) {
     }
 
     const visionModel = parseProviderModel(skillsPolicy.policy().coding_vision_model)
+    const needsVision =
+      mode === "normal" &&
+      images.length > 0 &&
+      !modelSupportsImages(currentModel) &&
+      !text.startsWith("/")
+
+    if (needsVision && !visionModel) {
+      showToast({
+        title: language.t("prompt.toast.visionModelRequired.title"),
+        description: language.t("prompt.toast.visionModelRequired.description"),
+      })
+    }
+
     const vision =
-      mode === "normal" && visionModel && !text.startsWith("/")
+      needsVision && visionModel
         ? {
             visionModel,
-            codingSupportsImages: modelSupportsImages(currentModel),
+            codingSupportsImages: false,
             locale: language.locale(),
             onDescribeStart: () => {
               showToast({

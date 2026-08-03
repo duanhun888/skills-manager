@@ -374,6 +374,42 @@ pub async fn open_opencode_editor(
     .map_err(|e| AppError::io(format!("join error: {e}")))?
 }
 
+/// Stop running OpenCode Desktop processes so the next launch picks up new
+/// policy files / a freshly installed binary after Skills updates.
+#[tauri::command]
+pub async fn terminate_opencode_editors() -> Result<u32, AppError> {
+    tauri::async_runtime::spawn_blocking(terminate_opencode_editors_blocking)
+        .await
+        .map_err(|e| AppError::io(format!("join error: {e}")))?
+}
+
+fn terminate_opencode_editors_blocking() -> Result<u32, AppError> {
+    #[cfg(windows)]
+    {
+        let mut killed = 0u32;
+        for name in ["OpenCode.exe", "OpenCode Dev.exe"] {
+            let status = Command::new("taskkill")
+                .args(["/IM", name, "/F", "/T"])
+                .output();
+            match status {
+                Ok(out) if out.status.success() => killed += 1,
+                _ => {}
+            }
+        }
+        return Ok(killed);
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = Command::new("pkill").args(["-f", "OpenCode"]).output();
+        return Ok(0);
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
+    {
+        let _ = Command::new("pkill").args(["-f", "opencode"]).output();
+        Ok(0)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OpenCodeModelPolicyDto {
     pub mode: String,

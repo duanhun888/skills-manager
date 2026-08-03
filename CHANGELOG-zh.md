@@ -1,5 +1,18 @@
 # Changelog (zh)
 
+## [1.4.11] - 2026-08-03
+
+### 发布概览
+- Skills 应用内更新后自动结束旧 OpenCode 并刷新组织策略，无需手动完全退出再打开工作台
+
+### 用户可见更新
+- 安装更新前关闭正在运行的 OpenCode；Skills 重启后重新同步模型策略，并提示重新打开工作台
+- 从 Skills 打开 OpenCode 时，若 Skills 版本相对上次打开已变，会先重启再打开
+- 编码区附图需要识图但未配置「编码区识图模型」时给出 toast 提示
+
+### 开发者与治理更新
+- 新增 `terminate_opencode_editors`；`openOpenCodeEditorFresh` 与启动后版本变更钩子
+
 ## [1.4.10] - 2026-08-03
 
 ### 发布概览

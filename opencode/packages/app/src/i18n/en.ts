@@ -314,9 +314,11 @@ export const dict = {
   "prompt.toast.promptSendFailed.title": "Failed to send prompt",
   "prompt.toast.promptSendFailed.description": "Unable to retrieve session",
   "prompt.toast.visionDescribe.title": "Reading screenshot…",
-  "prompt.toast.visionDescribe.description": "Using the org vision model with chat context, then continuing with your coding model.",
+  "prompt.toast.visionDescribe.description": "Using the org vision model, then continuing with your coding model.",
   "prompt.toast.visionDescribeFailed.title": "Screenshot describe failed",
   "prompt.toast.visionDescribeFailed.description": "Could not describe the image. Check the coding vision model in Skills admin, or switch to a vision model yourself.",
+  "prompt.toast.visionModelRequired.title": "Coding vision model not configured",
+  "prompt.toast.visionModelRequired.description": "This model cannot see images. Set Skills → Model policy → Coding vision model (e.g. alibaba-cn/qwen3-vl-plus), save, and reopen OpenCode — or switch to a vision model manually.",
 
   "dialog.mcp.title": "MCPs",
   "dialog.mcp.description": "{{enabled}} of {{total}} enabled",

@@ -330,9 +330,11 @@ export const dict = {
   "prompt.toast.promptSendFailed.title": "发送提示失败",
   "prompt.toast.promptSendFailed.description": "无法获取会话",
   "prompt.toast.visionDescribe.title": "正在识图…",
-  "prompt.toast.visionDescribe.description": "先用组织配置的视觉模型，结合会话上下文识别截图，再切回当前编码模型继续。",
+  "prompt.toast.visionDescribe.description": "先用组织配置的视觉模型识别截图，再切回当前编码模型继续。",
   "prompt.toast.visionDescribeFailed.title": "识图失败",
   "prompt.toast.visionDescribeFailed.description": "无法识别图片。请检查 Skills 管理端「编码区识图模型」，或手动切换到视觉模型。",
+  "prompt.toast.visionModelRequired.title": "未配置编码区识图模型",
+  "prompt.toast.visionModelRequired.description": "当前模型不能看图。请在 Skills「模型策略 → 编码区识图模型」填写如 alibaba-cn/qwen3-vl-plus 并保存，然后重新打开 OpenCode；或手动切换到视觉模型。",
 
   "dialog.mcp.title": "MCPs",
   "dialog.mcp.description": "已启用 {{enabled}} / {{total}}",

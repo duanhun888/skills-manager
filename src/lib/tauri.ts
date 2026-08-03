@@ -263,6 +263,46 @@ export const openOpenCodeEditor = (projectPath?: string | null) =>
     projectPath: projectPath ?? null,
   });
 
+/** Kill running OpenCode Desktop so the next launch is fresh (after Skills updates). */
+export const terminateOpenCodeEditors = () =>
+  invoke<number>("terminate_opencode_editors");
+
+const OPENCODE_SYNCED_APP_VERSION_KEY = "skills-manager.openCodeSyncedAppVersion";
+
+/**
+ * After a Skills app update, an already-running OpenCode process keeps old
+ * in-memory policy / UI. Restart it once when Skills version changed.
+ */
+export async function restartOpenCodeIfSkillsUpdated(): Promise<boolean> {
+  const info = await getDiagnosticInfo().catch(() => null);
+  const version = info?.app_version?.trim();
+  if (!version) return false;
+  let last: string | null = null;
+  try {
+    last = localStorage.getItem(OPENCODE_SYNCED_APP_VERSION_KEY);
+  } catch {
+    last = null;
+  }
+  if (last === version) return false;
+  try {
+    await terminateOpenCodeEditors();
+  } catch {
+    // Best-effort
+  }
+  try {
+    localStorage.setItem(OPENCODE_SYNCED_APP_VERSION_KEY, version);
+  } catch {
+    // ignore
+  }
+  return Boolean(last && last !== version);
+}
+
+/** Open OpenCode; restart first if Skills was updated since last open. */
+export async function openOpenCodeEditorFresh(projectPath?: string | null) {
+  await restartOpenCodeIfSkillsUpdated();
+  await openOpenCodeEditor(projectPath);
+}
+
 export interface OpenCodeModelPolicy {
   mode: string;
   requirements_only_models: string[];

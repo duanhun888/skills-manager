@@ -295,7 +295,7 @@ export function WorkspaceView({ config }: { config: WorkspaceConfig }) {
     setOpenCodeBusy(true);
     try {
       await api.syncOpenCodeOrgConfigFromServer(serverApiUrl, getStoredToken());
-      await api.openOpenCodeEditor(null);
+      await api.openOpenCodeEditorFresh(null);
       toast.success(t("settings.openCode.opened"));
     } catch (e) {
       const raw = getErrorMessage(e, t("common.error"));
@@ -332,7 +332,7 @@ export function WorkspaceView({ config }: { config: WorkspaceConfig }) {
         toast.message(t("settings.openCode.versionUnknown"));
       }
       await api.syncOpenCodeOrgConfigFromServer(serverApiUrl, getStoredToken());
-      await api.openOpenCodeEditor(null);
+      await api.openOpenCodeEditorFresh(null);
       toast.success(t("settings.openCode.opened"));
     } catch (e) {
       const raw = getErrorMessage(e, t("common.error"));

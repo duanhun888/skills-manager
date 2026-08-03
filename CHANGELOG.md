@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.4.11] - 2026-08-03
+
+### Release Overview
+- After Skills in-app update, stop stale OpenCode and refresh org policy so the workbench works without a manual quit/reopen
+
+### User-facing
+- Installing a Skills update closes running OpenCode before restart; after relaunch, policy is re-synced and a toast asks you to reopen the workbench
+- Opening OpenCode from Skills restarts it once when the Skills version changed since last open
+- Coding chat shows a toast when images need vision but 编码区识图模型 is not configured
+
+### Developer & Governance
+- New `terminate_opencode_editors` command; `openOpenCodeEditorFresh` / post-update AppContext hook
+
 ## [1.4.10] - 2026-08-03
 
 ### Release Overview

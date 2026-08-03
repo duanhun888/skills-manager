@@ -366,6 +366,48 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
 
+  // After Skills updates, stop stale OpenCode and refresh org policy so the
+  // next workbench launch is not stuck on old in-memory config / UI.
+  useEffect(() => {
+    if (loading) return;
+    let cancelled = false;
+    const LAST_SEEN_KEY = "skills-manager.lastSeenAppVersion";
+    void (async () => {
+      try {
+        const info = await api.getDiagnosticInfo();
+        const version = info.app_version?.trim();
+        if (!version || cancelled) return;
+        let previous: string | null = null;
+        try {
+          previous = localStorage.getItem(LAST_SEEN_KEY);
+        } catch {
+          previous = null;
+        }
+        try {
+          localStorage.setItem(LAST_SEEN_KEY, version);
+        } catch {
+          /* ignore */
+        }
+        if (!previous || previous === version) return;
+
+        await api.restartOpenCodeIfSkillsUpdated();
+        const serverUrl = await api.getSettings("server_api_url").catch(() => null);
+        const { getStoredToken } = await import("../lib/serverApi");
+        await api.syncOpenCodeOrgConfigFromServer(serverUrl, getStoredToken());
+        if (cancelled) return;
+        toast.info(i18n.t("settings.openCode.reopenAfterUpdate"), {
+          id: "opencode-reopen-after-update",
+          duration: 12000,
+        });
+      } catch (err) {
+        console.warn("Post-update OpenCode refresh failed:", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loading]);
+
   // Check for a newer Skills app release (prompt only; install after user confirms).
   useEffect(() => {
     if (loading) return;
