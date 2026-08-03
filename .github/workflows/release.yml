@@ -158,14 +158,15 @@ jobs:
           # Ad-hoc sign macOS bundles so Gatekeeper reports "unverified developer"
           # (dismissable via right-click → Open) instead of "app is damaged".
           APPLE_SIGNING_IDENTITY: ${{ startsWith(matrix.platform, 'macos') && '-' || '' }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: v__VERSION__
           releaseName: '芯宏Skills仓库 v__VERSION__'
           releaseBody: ${{ steps.changelog.outputs.body }}
           releaseDraft: false
           prerelease: false
-          # Repo uses npm (package-lock.json). Do not emit updater .sig (no signing keys).
-          includeUpdaterJson: false
+          includeUpdaterJson: true
           args: --target ${{ matrix.target }}
 
       - name: Verify macOS bundle signature
@@ -183,13 +184,28 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
           codesign -dvvv "$APP_PATH" 2>&1 | grep -E 'Signature|Sealed Resources|Identifier'
 
-  # Updater artifacts are disabled (createUpdaterArtifacts: false in tauri.conf.json).
-  # Re-enable this job when signing keys and updater publishing are configured.
   verify-updater-assets:
     needs: build
-    if: false
     runs-on: ubuntu-latest
     name: Verify updater assets
     steps:
-      - name: Validate updater metadata and signatures
-        run: echo "skipped"
+      - name: Confirm latest.json on release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ github.ref_name }}"
+          echo "Checking updater manifest on ${TAG}…"
+          # Wait briefly for GitHub to index the just-uploaded asset.
+          for i in 1 2 3 4 5; do
+            if gh release view "$TAG" --repo "${{ github.repository }}" --json assets \
+              --jq '.assets[].name' | grep -qx 'latest.json'; then
+              echo "Found latest.json on ${TAG}"
+              exit 0
+            fi
+            echo "Attempt ${i}: latest.json not listed yet, retrying…"
+            sleep 5
+          done
+          echo "latest.json missing from release ${TAG}" >&2
+          gh release view "$TAG" --repo "${{ github.repository }}" --json assets --jq '.assets[].name' || true
+          exit 1

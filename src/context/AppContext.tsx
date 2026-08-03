@@ -7,6 +7,11 @@ import i18n from "../i18n";
 import { applyTextSize } from "../lib/textScale";
 import { toast } from "sonner";
 import { findWeakPresetNames } from "../lib/presetNaming";
+import {
+  checkAppUpdate,
+  installAppUpdateAndRelaunch,
+  openAppDownloadPage,
+} from "../lib/appUpdate";
 
 interface AppState {
   presets: Preset[];
@@ -359,6 +364,50 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }, 3000);
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
+  // Check for a newer Skills app release (prompt only; install after user confirms).
+  useEffect(() => {
+    if (loading) return;
+    const APP_UPDATE_TOAST_ID = "app-update-available";
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const update = await checkAppUpdate();
+          if (cancelled || !update) return;
+          toast.info(i18n.t("settings.updateAvailable", { version: update.version }), {
+            id: APP_UPDATE_TOAST_ID,
+            duration: 15000,
+            action: {
+              label: i18n.t("settings.installUpdate"),
+              onClick: () => {
+                void (async () => {
+                  try {
+                    toast.info(i18n.t("settings.installing"), { id: APP_UPDATE_TOAST_ID });
+                    await installAppUpdateAndRelaunch(update);
+                  } catch (err) {
+                    console.error("App update install failed:", err);
+                    toast.error(i18n.t("settings.updateError"), { id: APP_UPDATE_TOAST_ID });
+                    try {
+                      await openAppDownloadPage();
+                    } catch {
+                      /* ignore */
+                    }
+                  }
+                })();
+              },
+            },
+          });
+        } catch (err) {
+          console.warn("Startup app update check failed:", err);
+        }
+      })();
+    }, 5000);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [loading]);
 
   // Refresh after a background auto-update round (Rust scheduler) or the

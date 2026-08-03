@@ -48,6 +48,11 @@ import { listen } from "@tauri-apps/api/event";
 import { writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
 import { open as dialogOpen, confirm as dialogConfirm } from "@tauri-apps/plugin-dialog";
 import { cn } from "../utils";
+import {
+  checkAppUpdate,
+  installAppUpdateAndRelaunch,
+  openAppDownloadPage,
+} from "../lib/appUpdate";
 import { useApp } from "../context/AppContext";
 import { useAuth } from "../context/useAuth";
 import { SERVER_API_URL_FIXED } from "../lib/serverApi";
@@ -190,6 +195,8 @@ export function Settings() {
   const [autoUpdateInterval, setAutoUpdateInterval] = useState("off");
   const [autoUpdateApply, setAutoUpdateApply] = useState("off");
   const [autoUpdateLastRun, setAutoUpdateLastRun] = useState<string | null>(null);
+  const [checkingAppUpdate, setCheckingAppUpdate] = useState(false);
+  const [installingAppUpdate, setInstallingAppUpdate] = useState(false);
   // Agent path editing
   const [editingPathKey, setEditingPathKey] = useState<string | null>(null);
   const [editingPathValue, setEditingPathValue] = useState("");
@@ -780,6 +787,42 @@ export function Settings() {
       toast.error(t("common.error"));
     } finally {
       setProxySaving(false);
+    }
+  };
+
+  const handleCheckAppUpdate = async () => {
+    if (checkingAppUpdate || installingAppUpdate) return;
+    setCheckingAppUpdate(true);
+    try {
+      const update = await checkAppUpdate();
+      if (!update) {
+        toast.success(t("settings.noUpdate"));
+        return;
+      }
+      const confirmed = await dialogConfirm(
+        t("settings.updateAvailable", { version: update.version }),
+        {
+          title: t("settings.checkUpdate"),
+          kind: "info",
+          okLabel: t("settings.installUpdate"),
+          cancelLabel: t("common.cancel"),
+        }
+      );
+      if (!confirmed) return;
+      setInstallingAppUpdate(true);
+      toast.info(t("settings.installing"));
+      await installAppUpdateAndRelaunch(update);
+    } catch (err) {
+      console.error("App update failed:", err);
+      toast.error(t("settings.updateError"));
+      try {
+        await openAppDownloadPage();
+      } catch {
+        /* ignore */
+      }
+    } finally {
+      setCheckingAppUpdate(false);
+      setInstallingAppUpdate(false);
     }
   };
 
@@ -1926,6 +1969,23 @@ export function Settings() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void handleCheckAppUpdate()}
+                disabled={checkingAppUpdate || installingAppUpdate}
+                className={`${actionButtonClass} bg-surface-hover hover:bg-surface-active text-tertiary border-border`}
+              >
+                {checkingAppUpdate || installingAppUpdate ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Download className="w-3 h-3" />
+                )}
+                {installingAppUpdate
+                  ? t("settings.installing")
+                  : checkingAppUpdate
+                    ? t("settings.checking")
+                    : t("settings.checkUpdate")}
+              </button>
               <button
                 type="button"
                 onClick={openHelp}

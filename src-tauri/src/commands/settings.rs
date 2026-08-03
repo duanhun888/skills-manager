@@ -141,6 +141,7 @@ pub async fn open_central_repo_folder() -> Result<(), AppError> {
     .await?
 }
 
+/// Legacy stub kept for IPC compatibility. Prefer `@tauri-apps/plugin-updater` from the frontend.
 #[tauri::command]
 pub async fn check_app_update(
     app: tauri::AppHandle,

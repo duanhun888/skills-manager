@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "芯宏Skills仓库",
-  "version": "1.4.8",
+  "version": "1.4.9",
   "identifier": "com.xinhong.skills",
   "build": {
     "frontendDist": "../dist",
@@ -30,7 +30,7 @@
   },
   "bundle": {
     "active": true,
-    "createUpdaterArtifacts": false,
+    "createUpdaterArtifacts": true,
     "targets": [
       "nsis",
       "dmg",
@@ -56,6 +56,17 @@
     },
     "macOS": {
       "minimumSystemVersion": "10.15"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRENEU5QjBGRUI3NTA0MTUKUldRVkJIWHJENXRPVGJzSmtlYlpUa3ZUbDRBRzhKK0J6NmU2S1BiZXdlYitkc3ZRaUw1NVptMlAK",
+      "endpoints": [
+        "https://github.com/duanhun888/skills-manager/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }

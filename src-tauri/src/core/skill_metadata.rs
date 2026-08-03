@@ -70,24 +70,29 @@ fn parse_yaml_tags(value: &serde_yaml::Value) -> Vec<String> {
     }
 }
 
+/// Unquoted `version: 1.0` parses as a YAML number, so accept numeric scalars too.
+fn yaml_version_string(value: &serde_yaml::Value) -> Option<String> {
+    match value {
+        serde_yaml::Value::String(s) => {
+            let t = s.trim();
+            if t.is_empty() {
+                None
+            } else {
+                Some(t.to_string())
+            }
+        }
+        serde_yaml::Value::Number(n) => Some(n.to_string()),
+        _ => None,
+    }
+}
+
 fn parse_display_version(yaml: &serde_yaml::Value) -> Option<String> {
-    if let Some(v) = yaml.get("version").and_then(|v| v.as_str()) {
-        let t = v.trim();
-        if !t.is_empty() {
-            return Some(t.to_string());
-        }
+    if let Some(v) = yaml.get("version").and_then(yaml_version_string) {
+        return Some(v);
     }
-    if let Some(v) = yaml
-        .get("metadata")
+    yaml.get("metadata")
         .and_then(|m| m.get("version"))
-        .and_then(|v| v.as_str())
-    {
-        let t = v.trim();
-        if !t.is_empty() {
-            return Some(t.to_string());
-        }
-    }
-    None
+        .and_then(yaml_version_string)
 }
 
 fn parse_frontmatter(content: &str) -> SkillMeta {

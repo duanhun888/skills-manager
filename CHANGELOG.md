@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.4.9] - 2026-08-03
+
+### Release Overview
+- First build with in-app auto-update (prompt → confirm → install → restart) via GitHub Releases
+
+### User-facing
+- Settings → About: **Check for Updates**; startup toast when a newer release is available (install only after you confirm)
+- **Upgrade note:** 1.4.7 / 1.4.8 must install 1.4.9 manually once; later versions can update in-app
+
+### Developer & Governance
+- Enable Tauri updater artifacts + `latest.json`; CI signs with `TAURI_SIGNING_PRIVATE_KEY` secrets
+- Endpoint: `https://github.com/duanhun888/skills-manager/releases/latest/download/latest.json` (Release assets must be anonymously downloadable)
+
 ## [1.4.8] - 2026-07-31
 
 ### Release Overview

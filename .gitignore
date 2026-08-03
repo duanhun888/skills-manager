@@ -36,6 +36,7 @@ credentials.json
 secrets.json
 *.p12
 *.pfx
+.tauri-keys/
 
 # Central API (private for now — deploy / keep in a private repo)
 # Anchor to repo root so vendored opencode/packages/server is NOT ignored.

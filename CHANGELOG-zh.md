@@ -1,5 +1,18 @@
 # Changelog (zh)
 
+## [1.4.9] - 2026-08-03
+
+### 发布概览
+- 首个支持应用内自动升级的版本（提示 → 确认 → 安装 → 重启），更新源为 GitHub Releases
+
+### 用户可见更新
+- 设置 → 关于：**检查更新**；启动后若有新版本会 toast 提示（需确认后才安装）
+- **升级说明：** 1.4.7 / 1.4.8 需先手动安装 1.4.9；之后版本可在应用内升级
+
+### 开发者与治理更新
+- 开启 Tauri updater 产物与 `latest.json`；CI 使用 `TAURI_SIGNING_PRIVATE_KEY` 签名
+- 更新地址：`https://github.com/duanhun888/skills-manager/releases/latest/download/latest.json`（Release 资源需可匿名下载）
+
 ## [1.4.8] - 2026-07-31
 
 ### 发布概览
