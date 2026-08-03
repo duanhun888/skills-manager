@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.10] - 2026-08-03
+
+### Release Overview
+- Coding-area screenshot describe can skip chat context when the ask is image-only
+
+### User-facing
+- Short asks like 「分析图片」/ bare attachments describe the image only (no forced prior-chat bias)
+- Say 「只看图」/「忽略上下文」to force image-only; coding asks like 「修这个报错」still use chat context
+
+### Developer & Governance
+- `visionDescribeMode` + separate system prompts for image-only vs task-context passes
+
 ## [1.4.9] - 2026-08-03
 
 ### Release Overview

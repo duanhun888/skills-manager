@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "芯宏Skills仓库",
-  "version": "1.4.9",
+  "version": "1.4.10",
   "identifier": "com.xinhong.skills",
   "build": {
     "frontendDist": "../dist",

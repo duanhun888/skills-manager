@@ -3,6 +3,7 @@ import {
   buildCodingFollowupText,
   buildVisionDescribeUserText,
   collectAssistantText,
+  visionDescribeMode,
 } from "./coding-vision"
 
 describe("coding-vision", () => {
@@ -16,16 +17,29 @@ describe("coding-vision", () => {
     ).toBe("a\n\nc")
   })
 
-  test("buildVisionDescribeUserText wraps user ask in zh", () => {
+  test("visionDescribeMode treats plain analyze-image as image_only", () => {
+    expect(visionDescribeMode("分析图片")).toBe("image_only")
+    expect(visionDescribeMode("识别图片")).toBe("image_only")
+    expect(visionDescribeMode("")).toBe("image_only")
+    expect(visionDescribeMode("只看图，说说界面")).toBe("image_only")
+  })
+
+  test("visionDescribeMode uses task_context for coding asks", () => {
+    expect(visionDescribeMode("修这个报错")).toBe("task_context")
+    expect(visionDescribeMode("按我们刚才说的改按钮颜色")).toBe("task_context")
+  })
+
+  test("buildVisionDescribeUserText wraps coding ask with context mode", () => {
     const text = buildVisionDescribeUserText("修这个报错", "zh")
-    expect(text).toContain("[识图准备]")
+    expect(text).toContain("[识图准备 · 结合上下文]")
     expect(text).toContain("修这个报错")
     expect(text).toContain("不要写业务代码")
   })
 
-  test("buildVisionDescribeUserText empty falls back with context hint", () => {
-    expect(buildVisionDescribeUserText("  ", "zh")).toContain("本会话上文")
-    expect(buildVisionDescribeUserText("", "en")).toContain("chat's context")
+  test("buildVisionDescribeUserText uses image-only for analyze-image", () => {
+    const text = buildVisionDescribeUserText("分析图片", "zh")
+    expect(text).toContain("[识图准备 · 仅看图]")
+    expect(text).toContain("不要参考本会话上文")
   })
 
   test("buildCodingFollowupText keeps user ask and marks vision proxy", () => {

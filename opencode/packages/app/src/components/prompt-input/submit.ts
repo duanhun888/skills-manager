@@ -17,10 +17,11 @@ import { Identifier } from "@/utils/id"
 import { Worktree as WorktreeState } from "@/utils/worktree"
 import { buildRequestParts } from "./build-request-parts"
 import {
-  VISION_DESCRIBE_SYSTEM,
   buildCodingFollowupText,
   buildVisionDescribeUserText,
   collectAssistantText,
+  visionDescribeMode,
+  visionDescribeSystem,
 } from "./coding-vision"
 import { setCursorPosition } from "./editor-dom"
 import { formatServerError } from "@/utils/server-errors"
@@ -103,7 +104,7 @@ async function resolveVisionDescription(input: {
       providerID: input.vision.visionModel.providerID,
       modelID: input.vision.visionModel.modelID,
     },
-    system: VISION_DESCRIBE_SYSTEM,
+    system: visionDescribeSystem(visionDescribeMode(input.text)),
     parts: requestParts,
   })
 
