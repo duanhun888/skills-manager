@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.12] - 2026-08-04
+
+### Release Overview
+- Requirements analysis shows real config validation details; one bad agent/command file no longer blocks the whole workbench
+
+### User-facing
+- `ConfigInvalidError` on requirements image analysis now surfaces the invalid file path and schema issues (e.g. `instructions` must be a string array)
+- Invalid custom agent/command markdown is skipped with a warning instead of failing every analysis
+
+### Developer & Governance
+- Soft-fail `ConfigAgent.load` / `ConfigCommand.load`; requirements chat uses `formatServerError`
+
 ## [1.4.11] - 2026-08-03
 
 ### Release Overview

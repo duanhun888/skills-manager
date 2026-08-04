@@ -1,12 +1,11 @@
 export * as ConfigAgent from "./agent"
 
 import path from "path"
-import { Exit, Schema } from "effect"
+import { Cause, Exit, Schema } from "effect"
 import { Glob } from "@opencode-ai/core/util/glob"
 import { ConfigAgentV1 } from "@opencode-ai/core/v1/config/agent"
 import { configEntryNameFromPath } from "./entry-name"
 import * as ConfigMarkdown from "./markdown"
-import { ConfigParse } from "./parse"
 
 export async function load(dir: string) {
   const result: Record<string, ConfigAgentV1.Info> = {}
@@ -26,7 +25,17 @@ export async function load(dir: string) {
       ...md.data,
       prompt: md.content.trim(),
     }
-    result[config.name] = ConfigParse.schema(ConfigAgentV1.Info, config, item)
+    // Skip invalid agent files instead of failing the whole instance config —
+    // one bad skill/agent must not block requirements image analysis.
+    const parsed = Schema.decodeUnknownExit(ConfigAgentV1.Info)(config, {
+      errors: "all",
+      propertyOrder: "original",
+    })
+    if (Exit.isSuccess(parsed)) {
+      result[config.name] = parsed.value
+      continue
+    }
+    console.warn(`[config] skipping invalid agent ${item}: ${Cause.pretty(parsed.cause)}`)
   }
   return result
 }

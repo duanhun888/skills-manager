@@ -5,7 +5,6 @@ import { Cause, Exit, Schema } from "effect"
 import { Glob } from "@opencode-ai/core/util/glob"
 import { ConfigCommandV1 } from "@opencode-ai/core/v1/config/command"
 import { configEntryNameFromPath } from "./entry-name"
-import { InvalidError } from "@opencode-ai/core/v1/config/error"
 import * as ConfigMarkdown from "./markdown"
 
 const decodeInfo = Schema.decodeUnknownExit(ConfigCommandV1.Info)
@@ -33,7 +32,9 @@ export async function load(dir: string) {
       result[config.name] = parsed.value
       continue
     }
-    throw new InvalidError({ path: item, message: Cause.pretty(parsed.cause) }, { cause: Cause.squash(parsed.cause) })
+    // Same soft-fail policy as agents: skip bad command files instead of
+    // failing the whole instance (blocks requirements image analysis).
+    console.warn(`[config] skipping invalid command ${item}: ${Cause.pretty(parsed.cause)}`)
   }
   return result
 }

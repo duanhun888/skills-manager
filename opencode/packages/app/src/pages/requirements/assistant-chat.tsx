@@ -182,6 +182,12 @@ export function AssistantChatPanel(props: {
     const err = (info as { error?: unknown }).error
     if (!err) return
     if (typeof err === "string") return err
+    // Prefer structured server errors (ConfigInvalidError issues, model-not-found, …)
+    // over the bare NamedError name that `.message` often collapses to.
+    const readable = formatServerError(err, language.t)
+    if (readable && readable !== "Unknown error" && readable !== language.t("error.chain.unknown")) {
+      return readable
+    }
     if (typeof err === "object") {
       const record = err as { message?: unknown; data?: { message?: unknown } }
       if (typeof record.message === "string" && record.message.trim()) return record.message
@@ -401,7 +407,7 @@ export function AssistantChatPanel(props: {
       scrollToBottom()
     } catch (err) {
       if (abort?.signal.aborted) return
-      const message = err instanceof Error ? err.message : String(err)
+      const message = formatServerError(err, language.t, err instanceof Error ? err.message : String(err))
       setError(message)
       requirements.appendMessage(props.project.id, {
         role: "assistant",

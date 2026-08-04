@@ -1,5 +1,17 @@
 # Changelog (zh)
 
+## [1.4.12] - 2026-08-04
+
+### 发布概览
+- 需求分析展示真实配置校验细节；单个坏的 agent/command 文件不再拖垮整个工作台
+
+### 用户可见更新
+- 需求区识图分析遇到 `ConfigInvalidError` 时，会显示无效文件路径与字段问题（例如 `instructions` 必须是字符串数组）
+- 非法自定义 agent/command 文档会跳过并告警，不再导致每次分析都失败
+
+### 开发者与治理更新
+- `ConfigAgent.load` / `ConfigCommand.load` 改为软失败；需求对话使用 `formatServerError`
+
 ## [1.4.11] - 2026-08-03
 
 ### 发布概览
