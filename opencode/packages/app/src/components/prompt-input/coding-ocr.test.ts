@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { isOcrUseful } from "./coding-ocr"
+import { collectTexts, isOcrUseful } from "./coding-ocr"
 
 describe("coding-ocr", () => {
   test("isOcrUseful accepts readable error text", () => {
@@ -26,5 +26,26 @@ describe("coding-ocr", () => {
     })
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.reason).toBe("low_confidence")
+  })
+
+  test("collectTexts reads PaddleX prunedResult nesting", () => {
+    const payload = {
+      errorCode: 0,
+      errorMsg: "Success",
+      result: {
+        ocrResults: [
+          {
+            prunedResult: {
+              rec_texts: ["LLaMA-Factory", "Easy and Efficient LLM Fine-Tuning"],
+              rec_scores: [0.99, 0.98],
+            },
+          },
+        ],
+      },
+    }
+    const got = collectTexts(payload)
+    expect(got.texts).toEqual(["LLaMA-Factory", "Easy and Efficient LLM Fine-Tuning"])
+    expect(got.scores).toEqual([0.99, 0.98])
+    expect(isOcrUseful(got).ok).toBe(true)
   })
 })

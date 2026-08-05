@@ -15,7 +15,7 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value as Record<string, unknown>
 }
 
-function collectTexts(payload: unknown): { texts: string[]; scores: number[] } {
+export function collectTexts(payload: unknown): { texts: string[]; scores: number[] } {
   const texts: string[] = []
   const scores: number[] = []
 
@@ -32,29 +32,30 @@ function collectTexts(payload: unknown): { texts: string[]; scores: number[] } {
     }
   }
 
-  const root = asRecord(payload)
-  if (!root) return { texts, scores }
+  const visit = (value: unknown, depth: number) => {
+    if (depth > 6) return
+    const node = asRecord(value)
+    if (!node) {
+      if (Array.isArray(value)) {
+        for (const item of value) visit(item, depth + 1)
+      }
+      return
+    }
 
-  // PaddleX OCR serving often nests under result / data / ocrResults.
-  const candidates = [
-    root,
-    asRecord(root.result),
-    asRecord(root.data),
-    ...(Array.isArray(root.result) ? root.result.map(asRecord) : []),
-    ...(Array.isArray(root.data) ? root.data.map(asRecord) : []),
-    ...(Array.isArray(root.ocrResults) ? root.ocrResults.map(asRecord) : []),
-    ...(Array.isArray(asRecord(root.result)?.ocrResults)
-      ? ((asRecord(root.result)?.ocrResults as unknown[]) ?? []).map(asRecord)
-      : []),
-  ].filter(Boolean) as Record<string, unknown>[]
-
-  for (const node of candidates) {
     pushTexts(node.rec_texts)
     pushTexts(node.recTexts)
     pushScores(node.rec_scores)
     pushScores(node.recScores)
+
+    // PaddleX serving nests under result / data / ocrResults / prunedResult.
+    visit(node.result, depth + 1)
+    visit(node.data, depth + 1)
+    visit(node.ocrResults, depth + 1)
+    visit(node.prunedResult, depth + 1)
+    visit(node.pruned_result, depth + 1)
   }
 
+  visit(payload, 0)
   return { texts, scores }
 }
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.16] - 2026-08-05
+
+### Release Overview
+- Fix coding OCR: parse nested PaddleX `rec_texts` so successful OCR is not treated as empty
+
+### User-facing
+- When the local OCR service returns text, Skills/OpenCode no longer falsely falls back to VL with “OCR unavailable”
+- Nested shapes such as `result.ocrResults[].prunedResult.rec_texts` are recognized
+
+### Developer & Governance
+- `coding-ocr`: recursively collect `rec_texts` / `rec_scores`; add nested-payload unit test
+
 ## [1.4.15] - 2026-08-05
 
 ### Release Overview

@@ -1,5 +1,17 @@
 # Changelog (zh)
 
+## [1.4.16] - 2026-08-05
+
+### 发布概览
+- 修复编码区 OCR：正确解析 PaddleX 嵌套的 `rec_texts`，避免误降级到 VL
+
+### 用户可见更新
+- 本地 OCR 服务已成功返回文字时，不再误报「OCR 不可用，改用识图」
+- OpenCode 可识别 `result.ocrResults[].prunedResult.rec_texts` 等嵌套结构
+
+### 开发者与治理更新
+- `coding-ocr`：递归收集 `rec_texts` / `rec_scores`；补充嵌套 payload 单测
+
 ## [1.4.15] - 2026-08-05
 
 ### 发布概览
