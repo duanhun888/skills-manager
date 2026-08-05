@@ -5,7 +5,13 @@ export type SkillsModelPolicy = {
   mode: "open" | "restricted"
   requirements_only_models: string[]
   coding_vision_model?: string
+  /** Optional PaddleX OCR serving URL (e.g. http://192.168.1.230:8080). Tried before VL. */
+  coding_ocr_url?: string
+  /** Image describe pipeline when coding model cannot see images. Default: ocr_then_vl */
+  coding_image_priority?: CodingImagePriority
 }
+
+export type CodingImagePriority = "ocr_then_vl" | "vl_then_ocr" | "ocr_only" | "vl_only"
 
 const OPEN: SkillsModelPolicy = { mode: "open", requirements_only_models: [] }
 const POLL_MS = 60_000
@@ -15,7 +21,13 @@ let lastGood: SkillsModelPolicy = OPEN
 let lastFingerprint = fingerprint(OPEN)
 
 function fingerprint(data: SkillsModelPolicy) {
-  return `${data.mode}|${data.requirements_only_models.join("\n")}|${data.coding_vision_model ?? ""}`
+  return `${data.mode}|${data.requirements_only_models.join("\n")}|${data.coding_vision_model ?? ""}|${data.coding_ocr_url ?? ""}|${data.coding_image_priority ?? ""}`
+}
+
+export function parseCodingImagePriority(raw: string | undefined | null): CodingImagePriority {
+  const value = raw?.trim().toLowerCase()
+  if (value === "vl_then_ocr" || value === "ocr_only" || value === "vl_only") return value
+  return "ocr_then_vl"
 }
 
 function normalizeKey(providerID: string, modelID: string) {
@@ -80,15 +92,28 @@ export function modelSupportsImages(item: {
   return Array.isArray(modalities) && modalities.includes("image")
 }
 
-function parsePolicy(data: Partial<SkillsModelPolicy> & { coding_vision_model?: string | null }): SkillsModelPolicy {
+function parsePolicy(
+  data: Partial<SkillsModelPolicy> & {
+    coding_vision_model?: string | null
+    coding_ocr_url?: string | null
+    coding_image_priority?: string | null
+  },
+): SkillsModelPolicy {
   const vision =
     typeof data.coding_vision_model === "string" ? data.coding_vision_model.trim() : ""
+  const ocr = typeof data.coding_ocr_url === "string" ? data.coding_ocr_url.trim() : ""
+  const priority =
+    typeof data.coding_image_priority === "string"
+      ? parseCodingImagePriority(data.coding_image_priority)
+      : undefined
   return {
     mode: data.mode === "restricted" ? "restricted" : "open",
     requirements_only_models: Array.isArray(data.requirements_only_models)
       ? data.requirements_only_models.filter((x): x is string => typeof x === "string")
       : [],
     coding_vision_model: vision || undefined,
+    coding_ocr_url: ocr || undefined,
+    coding_image_priority: priority,
   }
 }
 

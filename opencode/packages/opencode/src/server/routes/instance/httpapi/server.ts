@@ -201,6 +201,8 @@ const skillsModelPolicyRoute = HttpRouter.use((router) =>
         mode: info.mode,
         requirements_only_models: info.requirementsOnlyModels,
         coding_vision_model: info.codingVisionModel ?? null,
+        coding_ocr_url: info.codingOcrUrl ?? null,
+        coding_image_priority: info.codingImagePriority ?? null,
       })
     }),
   ),

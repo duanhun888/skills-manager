@@ -123,44 +123,35 @@ export function buildVisionDescribeUserText(userText: string, locale: string): s
 }
 
 /** Follow-up user text for the coding model (Pass2), after images were described. */
-export function buildCodingFollowupText(userText: string, description: string, locale: string): string {
+export function buildCodingFollowupText(
+  userText: string,
+  description: string,
+  locale: string,
+  source: "ocr" | "vl" = "vl",
+) {
   const trimmed = userText.trim()
   const desc = description.trim()
   const mode = visionDescribeMode(trimmed)
   if (isZh(locale)) {
-    const header =
-      mode === "image_only"
-        ? [
-            "[截图识别]",
-            "以下由视觉模型仅根据附图生成（未强制结合上文）；编码模型看不到原图。请按用户请求继续处理，识图如有遗漏以用户请求为准。",
-            "",
-            desc,
-          ].join("\n")
-        : [
-            "[截图识别]",
-            "以下由视觉模型根据附图与会话上下文生成；编码模型看不到原图。请结合会话历史与用户意图继续处理，识图如有遗漏以用户请求为准。",
-            "",
-            desc,
-          ].join("\n")
+    const via =
+      source === "ocr"
+        ? "以下由本地 OCR 从附图提取文字（编码模型看不到原图）。请按用户请求继续处理，文字如有遗漏以用户请求为准。"
+        : mode === "image_only"
+          ? "以下由视觉模型仅根据附图生成（未强制结合上文）；编码模型看不到原图。请按用户请求继续处理，识图如有遗漏以用户请求为准。"
+          : "以下由视觉模型根据附图与会话上下文生成；编码模型看不到原图。请结合会话历史与用户意图继续处理，识图如有遗漏以用户请求为准。"
+    const header = ["[截图识别]", via, "", desc].join("\n")
     if (!trimmed) {
       return `${header}\n\n请结合上述识图结果继续处理。`
     }
     return `${trimmed}\n\n${header}`
   }
-  const header =
-    mode === "image_only"
-      ? [
-          "[Screenshot describe]",
-          "Produced from the image(s) only (chat context was not forced); the coding model cannot see the original image. Continue from the user request; if the describe misses details, prefer the user request.",
-          "",
-          desc,
-        ].join("\n")
-      : [
-          "[Screenshot describe]",
-          "Produced by a vision model from the attached image(s) and chat context; the coding model cannot see the original image. Continue from chat history and the user intent; if the describe misses details, prefer the user request.",
-          "",
-          desc,
-        ].join("\n")
+  const via =
+    source === "ocr"
+      ? "Extracted by local OCR from the screenshot(s); the coding model cannot see the original image. Continue from the user request; if text is incomplete, prefer the user request."
+      : mode === "image_only"
+        ? "Produced from the image(s) only (chat context was not forced); the coding model cannot see the original image. Continue from the user request; if the describe misses details, prefer the user request."
+        : "Produced by a vision model from the attached image(s) and chat context; the coding model cannot see the original image. Continue from chat history and the user intent; if the describe misses details, prefer the user request."
+  const header = ["[Screenshot describe]", via, "", desc].join("\n")
   if (!trimmed) {
     return `${header}\n\nContinue using the description above.`
   }

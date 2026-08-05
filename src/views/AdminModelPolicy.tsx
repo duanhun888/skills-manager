@@ -13,6 +13,7 @@ import { syncOpenCodeModelPolicy } from "../lib/tauri";
 import { getErrorMessage } from "../lib/error";
 
 type PolicyMode = "open" | "restricted";
+type ImagePriority = "ocr_then_vl" | "vl_then_ocr" | "ocr_only" | "vl_only";
 
 const DEFAULT_MODELS = [
   "alibaba-cn/qwen3-vl-plus",
@@ -20,6 +21,12 @@ const DEFAULT_MODELS = [
   "alibaba-cn/qwen2.5-vl-72b-instruct",
   "alibaba-cn/qwen3.7-plus",
 ].join("\n");
+
+function parseImagePriority(raw: string | undefined | null): ImagePriority {
+  const value = raw?.trim().toLowerCase();
+  if (value === "vl_then_ocr" || value === "ocr_only" || value === "vl_only") return value;
+  return "ocr_then_vl";
+}
 
 export function AdminModelPolicy() {
   const { t } = useTranslation();
@@ -32,6 +39,8 @@ export function AdminModelPolicy() {
   const [mode, setMode] = useState<PolicyMode>("open");
   const [modelsText, setModelsText] = useState(DEFAULT_MODELS);
   const [codingVisionModel, setCodingVisionModel] = useState("alibaba-cn/qwen3-vl-plus");
+  const [codingOcrUrl, setCodingOcrUrl] = useState("");
+  const [imagePriority, setImagePriority] = useState<ImagePriority>("ocr_then_vl");
 
   const load = useCallback(async () => {
     if (!serverApiUrl.trim()) return;
@@ -42,6 +51,8 @@ export function AdminModelPolicy() {
       const models = cfg.requirements_only_models ?? [];
       setModelsText(models.length > 0 ? models.join("\n") : DEFAULT_MODELS);
       setCodingVisionModel(cfg.coding_vision_model?.trim() || "");
+      setCodingOcrUrl(cfg.coding_ocr_url?.trim() || "");
+      setImagePriority(parseImagePriority(cfg.coding_image_priority));
     } catch (err) {
       toast.error(getErrorMessage(err, t("common.error")));
     } finally {
@@ -69,11 +80,15 @@ export function AdminModelPolicy() {
         mode,
         requirements_only_models: models,
         coding_vision_model: codingVisionModel.trim(),
+        coding_ocr_url: codingOcrUrl.trim(),
+        coding_image_priority: imagePriority,
       });
       await syncOpenCodeModelPolicy({
         mode: cfg.model_policy_mode === "restricted" ? "restricted" : "open",
         requirements_only_models: cfg.requirements_only_models ?? models,
         coding_vision_model: cfg.coding_vision_model?.trim() || codingVisionModel.trim() || null,
+        coding_ocr_url: cfg.coding_ocr_url?.trim() || codingOcrUrl.trim() || null,
+        coding_image_priority: imagePriority,
       });
       toast.success(t("admin.policy.saved"));
       await load();
@@ -158,6 +173,22 @@ export function AdminModelPolicy() {
       </div>
 
       <div className="space-y-2">
+        <label className="text-sm font-medium text-secondary" htmlFor="coding-ocr-url">
+          {t("admin.policy.codingOcr")}
+        </label>
+        <p className="text-[13px] text-tertiary">{t("admin.policy.codingOcrHint")}</p>
+        <input
+          id="coding-ocr-url"
+          type="text"
+          className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm font-mono"
+          value={codingOcrUrl}
+          onChange={(e) => setCodingOcrUrl(e.target.value)}
+          placeholder="http://192.168.1.230:8080"
+          spellCheck={false}
+        />
+      </div>
+
+      <div className="space-y-2">
         <label className="text-sm font-medium text-secondary" htmlFor="coding-vision-model">
           {t("admin.policy.codingVision")}
         </label>
@@ -171,6 +202,32 @@ export function AdminModelPolicy() {
           placeholder="alibaba-cn/qwen3-vl-plus"
           spellCheck={false}
         />
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-secondary">{t("admin.policy.imagePriority")}</label>
+        <p className="text-[13px] text-tertiary">{t("admin.policy.imagePriorityHint")}</p>
+        <div className="flex flex-col gap-2">
+          {(
+            [
+              ["ocr_then_vl", "imagePriorityOcrThenVl"],
+              ["vl_then_ocr", "imagePriorityVlThenOcr"],
+              ["ocr_only", "imagePriorityOcrOnly"],
+              ["vl_only", "imagePriorityVlOnly"],
+            ] as const
+          ).map(([value, labelKey]) => (
+            <label key={value} className="flex items-start gap-2 text-sm cursor-pointer">
+              <input
+                type="radio"
+                name="coding-image-priority"
+                className="mt-1"
+                checked={imagePriority === value}
+                onChange={() => setImagePriority(value)}
+              />
+              <span className="text-primary">{t(`admin.policy.${labelKey}`)}</span>
+            </label>
+          ))}
+        </div>
       </div>
 
       <button

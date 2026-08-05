@@ -217,7 +217,7 @@ export function WorkspaceView({ config }: { config: WorkspaceConfig }) {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { tools, managedSkills, presets, refreshManagedSkills, refreshTools } = useApp();
-  const { serverApiUrl } = useAuth();
+  const { serverApiUrl, user } = useAuth();
 
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [search, setSearch] = useState("");
@@ -294,7 +294,7 @@ export function WorkspaceView({ config }: { config: WorkspaceConfig }) {
   const launchOpenCode = useCallback(async () => {
     setOpenCodeBusy(true);
     try {
-      await api.syncOpenCodeOrgConfigFromServer(serverApiUrl, getStoredToken());
+      await api.syncOpenCodeOrgConfigFromServer(serverApiUrl, getStoredToken(), user?.id);
       await api.openOpenCodeEditorFresh(null);
       toast.success(t("settings.openCode.opened"));
     } catch (e) {
@@ -307,7 +307,7 @@ export function WorkspaceView({ config }: { config: WorkspaceConfig }) {
     } finally {
       setOpenCodeBusy(false);
     }
-  }, [serverApiUrl, t]);
+  }, [serverApiUrl, user?.id, t]);
 
   const handleOpenOpenCode = useCallback(async () => {
     setOpenCodeBusy(true);
@@ -331,7 +331,7 @@ export function WorkspaceView({ config }: { config: WorkspaceConfig }) {
       if (status.expected_version && !status.installed_version && status.desktop_installed) {
         toast.message(t("settings.openCode.versionUnknown"));
       }
-      await api.syncOpenCodeOrgConfigFromServer(serverApiUrl, getStoredToken());
+      await api.syncOpenCodeOrgConfigFromServer(serverApiUrl, getStoredToken(), user?.id);
       await api.openOpenCodeEditorFresh(null);
       toast.success(t("settings.openCode.opened"));
     } catch (e) {
@@ -344,7 +344,7 @@ export function WorkspaceView({ config }: { config: WorkspaceConfig }) {
     } finally {
       setOpenCodeBusy(false);
     }
-  }, [serverApiUrl, t]);
+  }, [serverApiUrl, user?.id, t]);
 
   const localSkillsRequestRef = useRef(0);
   const loadLocalSkills = useCallback(async () => {

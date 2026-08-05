@@ -48,5 +48,12 @@ describe("coding-vision", () => {
     expect(text).toContain("[截图识别]")
     expect(text).toContain("看不到原图")
     expect(text).toContain("按钮是红色")
+    expect(text).toContain("视觉模型")
+  })
+
+  test("buildCodingFollowupText marks OCR source", () => {
+    const text = buildCodingFollowupText("修这个报错", "Error: boom", "zh", "ocr")
+    expect(text).toContain("本地 OCR")
+    expect(text).toContain("Error: boom")
   })
 })

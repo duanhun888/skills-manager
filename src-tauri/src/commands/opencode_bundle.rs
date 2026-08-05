@@ -417,6 +417,10 @@ pub struct OpenCodeModelPolicyDto {
     pub requirements_only_models: Vec<String>,
     #[serde(default)]
     pub coding_vision_model: Option<String>,
+    #[serde(default)]
+    pub coding_ocr_url: Option<String>,
+    #[serde(default)]
+    pub coding_image_priority: Option<String>,
 }
 
 fn opencode_user_config_dir() -> PathBuf {
@@ -513,10 +517,27 @@ fn write_policy_file(dir: &Path, policy: &OpenCodeModelPolicyDto) -> Result<(), 
         .as_deref()
         .map(|s| s.trim())
         .filter(|s| !s.is_empty());
+    let coding_ocr = policy
+        .coding_ocr_url
+        .as_deref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty());
+    let coding_priority = policy
+        .coding_image_priority
+        .as_deref()
+        .map(|s| s.trim().to_ascii_lowercase())
+        .filter(|s| {
+            matches!(
+                s.as_str(),
+                "ocr_then_vl" | "vl_then_ocr" | "ocr_only" | "vl_only"
+            )
+        });
     let body = serde_json::json!({
         "mode": mode,
         "requirements_only_models": models,
         "coding_vision_model": coding_vision,
+        "coding_ocr_url": coding_ocr,
+        "coding_image_priority": coding_priority,
         "updated_by": "skills-manager",
     });
     let text = serde_json::to_string_pretty(&body)
@@ -541,6 +562,69 @@ pub async fn sync_opencode_model_policy(
             written.push(
                 managed_dir
                     .join("skills-model-policy.json")
+                    .display()
+                    .to_string(),
+            );
+        }
+
+        Ok(written.join("; "))
+    })
+    .await
+    .map_err(|e| AppError::io(format!("join error: {e}")))?
+}
+
+fn write_user_image_policy_file(dir: &Path, priority: Option<&str>) -> Result<(), AppError> {
+    std::fs::create_dir_all(dir)
+        .map_err(|e| AppError::io(format!("create opencode config dir failed: {e}")))?;
+    let path = dir.join("skills-model-user-policy.json");
+    let normalized = priority
+        .map(|s| s.trim().to_ascii_lowercase())
+        .filter(|s| {
+            matches!(
+                s.as_str(),
+                "ocr_then_vl" | "vl_then_ocr" | "ocr_only" | "vl_only"
+            )
+        });
+    if normalized.is_none() {
+        if path.exists() {
+            std::fs::remove_file(&path)
+                .map_err(|e| AppError::io(format!("remove {}: {e}", path.display())))?;
+        }
+        return Ok(());
+    }
+    let body = serde_json::json!({
+        "coding_image_priority": normalized,
+        "updated_by": "skills-manager-user",
+    });
+    let text = serde_json::to_string_pretty(&body)
+        .map_err(|e| AppError::internal(format!("serialize user image policy failed: {e}")))?;
+    std::fs::write(&path, text)
+        .map_err(|e| AppError::io(format!("write {}: {e}", path.display())))?;
+    Ok(())
+}
+
+/// Write or clear per-user image-priority overlay for OpenCode (org policy stays separate).
+#[tauri::command]
+pub async fn sync_opencode_user_image_policy(
+    coding_image_priority: Option<String>,
+) -> Result<String, AppError> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let priority = coding_image_priority
+            .as_deref()
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty());
+        let user_dir = opencode_user_config_dir();
+        write_user_image_policy_file(&user_dir, priority)?;
+        let mut written = vec![user_dir
+            .join("skills-model-user-policy.json")
+            .display()
+            .to_string()];
+
+        let managed_dir = opencode_managed_config_dir();
+        if write_user_image_policy_file(&managed_dir, priority).is_ok() {
+            written.push(
+                managed_dir
+                    .join("skills-model-user-policy.json")
                     .display()
                     .to_string(),
             );

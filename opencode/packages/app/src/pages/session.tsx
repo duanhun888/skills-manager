@@ -65,6 +65,7 @@ import { promptLength } from "@/components/prompt-input/history"
 import { type FollowupDraft, sendFollowupDraft } from "@/components/prompt-input/submit"
 import {
   modelSupportsImages,
+  parseCodingImagePriority,
   parseProviderModel,
   useSkillsModelPolicy,
 } from "@/utils/skills-model-policy"
@@ -1799,14 +1800,41 @@ export default function Page() {
         draft: item,
         optimisticBusy: item.sessionDirectory === sdk().directory,
         vision: (() => {
-          const visionModel = parseProviderModel(skillsPolicy.policy().coding_vision_model)
-          if (!visionModel) return undefined
+          const policy = skillsPolicy.policy()
+          const visionModel = parseProviderModel(policy.coding_vision_model)
+          const ocrUrl = policy.coding_ocr_url?.trim() || undefined
+          const priority = parseCodingImagePriority(policy.coding_image_priority)
+          const pipelineReady =
+            (priority === "ocr_only" && !!ocrUrl) ||
+            (priority === "vl_only" && !!visionModel) ||
+            (priority !== "ocr_only" && priority !== "vl_only" && (!!ocrUrl || !!visionModel))
+          if (!pipelineReady) return undefined
           const provider = sync().data.provider.all.get(item.model.providerID)
           const modelInfo = provider?.models?.[item.model.modelID]
           return {
             visionModel,
+            ocrUrl,
+            priority,
             codingSupportsImages: modelSupportsImages(modelInfo),
             locale: language.locale(),
+            onOcrStart: () => {
+              showToast({
+                title: language.t("prompt.toast.ocrStart.title"),
+                description: language.t("prompt.toast.ocrStart.description"),
+              })
+            },
+            onOcrFallbackVision: () => {
+              showToast({
+                title: language.t("prompt.toast.ocrFallbackVision.title"),
+                description: language.t("prompt.toast.ocrFallbackVision.description"),
+              })
+            },
+            onVisionFallbackOcr: () => {
+              showToast({
+                title: language.t("prompt.toast.visionFallbackOcr.title"),
+                description: language.t("prompt.toast.visionFallbackOcr.description"),
+              })
+            },
             onDescribeStart: () => {
               showToast({
                 title: language.t("prompt.toast.visionDescribe.title"),

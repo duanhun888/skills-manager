@@ -307,10 +307,79 @@ export interface OpenCodeModelPolicy {
   mode: string;
   requirements_only_models: string[];
   coding_vision_model?: string | null;
+  coding_ocr_url?: string | null;
+  coding_image_priority?: string | null;
 }
 
 export const syncOpenCodeModelPolicy = (policy: OpenCodeModelPolicy) =>
   invoke<string>("sync_opencode_model_policy", { policy });
+
+/** Write or clear per-user image-priority overlay (`skills-model-user-policy.json`). */
+export const syncOpenCodeUserImagePolicy = (codingImagePriority?: string | null) =>
+  invoke<string>("sync_opencode_user_image_policy", {
+    codingImagePriority: codingImagePriority?.trim() || null,
+  });
+
+const USER_IMAGE_PRIORITY_KEY = (userId: string) =>
+  `user_coding_image_priority:${userId.trim()}`;
+
+export type CodingImagePriorityPref =
+  | "default"
+  | "ocr_then_vl"
+  | "vl_then_ocr"
+  | "ocr_only"
+  | "vl_only";
+
+export function parseCodingImagePriorityPref(
+  raw: string | null | undefined
+): CodingImagePriorityPref {
+  const value = raw?.trim().toLowerCase();
+  if (
+    value === "ocr_then_vl" ||
+    value === "vl_then_ocr" ||
+    value === "ocr_only" ||
+    value === "vl_only"
+  ) {
+    return value;
+  }
+  return "default";
+}
+
+export async function getUserCodingImagePriority(
+  userId: string
+): Promise<CodingImagePriorityPref> {
+  if (!userId.trim()) return "default";
+  const raw = await getSettings(USER_IMAGE_PRIORITY_KEY(userId)).catch(() => null);
+  return parseCodingImagePriorityPref(raw);
+}
+
+/** Persist personal override (or clear to org default) and sync OpenCode overlay. */
+export async function setUserCodingImagePriority(
+  userId: string,
+  pref: CodingImagePriorityPref
+): Promise<void> {
+  if (!userId.trim()) return;
+  const key = USER_IMAGE_PRIORITY_KEY(userId);
+  if (pref === "default") {
+    await setSettings(key, "");
+    await syncOpenCodeUserImagePolicy(null);
+    return;
+  }
+  await setSettings(key, pref);
+  await syncOpenCodeUserImagePolicy(pref);
+}
+
+/** Apply SkillStore preference for this user onto OpenCode overlay file. */
+export async function applyUserCodingImagePriorityToOpenCode(
+  userId?: string | null
+): Promise<void> {
+  if (!userId?.trim()) {
+    await syncOpenCodeUserImagePolicy(null);
+    return;
+  }
+  const pref = await getUserCodingImagePriority(userId);
+  await syncOpenCodeUserImagePolicy(pref === "default" ? null : pref);
+}
 
 export interface OpenCodeProviderAuthEntry {
   type: string;
@@ -338,6 +407,8 @@ export async function syncOpenCodeModelPolicyFromServer(
       mode: cfg.model_policy_mode === "restricted" ? "restricted" : "open",
       requirements_only_models: cfg.requirements_only_models ?? [],
       coding_vision_model: cfg.coding_vision_model?.trim() || null,
+      coding_ocr_url: cfg.coding_ocr_url?.trim() || null,
+      coding_image_priority: cfg.coding_image_priority?.trim() || null,
     });
   } catch {
     // Offline / no server — leave existing local policy file untouched.
@@ -370,15 +441,19 @@ export async function syncOpenCodeProviderAuthFromServer(
   }
 }
 
-/** Sync model policy + org provider keys for OpenCode. */
+/** Sync model policy + org provider keys for OpenCode, then apply personal image-priority overlay when userId is known. */
 export async function syncOpenCodeOrgConfigFromServer(
   serverApiUrl?: string | null,
-  token?: string | null
+  token?: string | null,
+  userId?: string | null
 ): Promise<void> {
   await Promise.all([
     syncOpenCodeModelPolicyFromServer(serverApiUrl),
     syncOpenCodeProviderAuthFromServer(serverApiUrl, token),
   ]);
+  if (userId?.trim()) {
+    await applyUserCodingImagePriorityToOpenCode(userId).catch(() => {});
+  }
 }
 // ── Skills ──
 

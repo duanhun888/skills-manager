@@ -1,5 +1,20 @@
 # Changelog (zh)
 
+## [1.4.13] - 2026-08-05
+
+### 发布概览
+- 编码区截图：可配置 OCR / VL 优先级
+
+### 用户可见更新
+- Skills 模型策略新增 **编码区 OCR 服务** 与 **识图优先级**（组织默认）
+- 账号可在 **设置 → 我的编码区识图优先级** 单独覆盖（默认=跟随组织）；需强制先用模型的账号可选「先 VL」
+- 可选：OCR→VL、VL→OCR、仅 OCR、仅 VL
+- Toast 区分 OCR / VL；跟进文案标注识图来源
+
+### 开发者与治理更新
+- 策略字段：`coding_ocr_url`、`coding_image_priority`；账号覆盖写入 `skills-model-user-policy.json`（本机按 user id 存储）
+- 管理端保存仍会写入本机 OpenCode 策略
+
 ## [1.4.12] - 2026-08-04
 
 ### 发布概览

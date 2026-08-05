@@ -333,6 +333,10 @@ pub struct ServerPublicConfigDto {
     pub requirements_only_models: Vec<String>,
     #[serde(default)]
     pub coding_vision_model: Option<String>,
+    #[serde(default)]
+    pub coding_ocr_url: Option<String>,
+    #[serde(default)]
+    pub coding_image_priority: Option<String>,
 }
 
 fn default_model_policy_mode() -> String {

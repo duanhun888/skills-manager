@@ -11,6 +11,8 @@ export type Info = {
   mode: Mode
   requirementsOnlyModels: string[]
   codingVisionModel?: string
+  codingOcrUrl?: string
+  codingImagePriority?: "ocr_then_vl" | "vl_then_ocr" | "ocr_only" | "vl_only"
 }
 
 const DEFAULT: Info = {
@@ -19,8 +21,10 @@ const DEFAULT: Info = {
 }
 
 type Cache = {
-  mtimeMs: number
-  path: string
+  orgPath: string
+  orgMtimeMs: number
+  userPath: string
+  userMtimeMs: number
   info: Info
 }
 
@@ -33,6 +37,27 @@ function candidatePaths(): string[] {
   // Managed (ProgramData / MDM) wins over user config.
   out.push(managed, user)
   return out
+}
+
+function userOverlayPaths(): string[] {
+  return [
+    path.join(ConfigManaged.managedConfigDir(), "skills-model-user-policy.json"),
+    path.join(Global.Path.config, "skills-model-user-policy.json"),
+  ]
+}
+
+function parsePriority(raw: unknown): Info["codingImagePriority"] | undefined {
+  if (typeof raw !== "string") return undefined
+  const priorityRaw = raw.trim().toLowerCase()
+  if (
+    priorityRaw === "vl_then_ocr" ||
+    priorityRaw === "ocr_only" ||
+    priorityRaw === "vl_only" ||
+    priorityRaw === "ocr_then_vl"
+  ) {
+    return priorityRaw
+  }
+  return undefined
 }
 
 function normalizeKey(providerID: string, modelID: string) {
@@ -100,14 +125,19 @@ function parse(raw: unknown): Info {
     : []
   const codingVision =
     typeof obj.coding_vision_model === "string" ? obj.coding_vision_model.trim() : ""
+  const codingOcr =
+    typeof obj.coding_ocr_url === "string" ? obj.coding_ocr_url.trim() : ""
+  const codingImagePriority = parsePriority(obj.coding_image_priority)
   return {
     mode,
     requirementsOnlyModels: models,
     codingVisionModel: codingVision || undefined,
+    codingOcrUrl: codingOcr || undefined,
+    codingImagePriority,
   }
 }
 
-function loadFromDisk(): { path: string; mtimeMs: number; info: Info } | undefined {
+function loadOrgFromDisk(): { path: string; mtimeMs: number; info: Info } | undefined {
   for (const file of candidatePaths()) {
     if (!existsSync(file)) continue
     try {
@@ -121,18 +151,48 @@ function loadFromDisk(): { path: string; mtimeMs: number; info: Info } | undefin
   return undefined
 }
 
+function loadUserOverlay(): { path: string; mtimeMs: number; priority?: Info["codingImagePriority"] } {
+  for (const file of userOverlayPaths()) {
+    if (!existsSync(file)) continue
+    try {
+      const st = statSync(file)
+      const text = readFileSync(file, "utf8")
+      const obj = JSON.parse(text) as Record<string, unknown>
+      return { path: file, mtimeMs: st.mtimeMs, priority: parsePriority(obj.coding_image_priority) }
+    } catch {
+      continue
+    }
+  }
+  return { path: "", mtimeMs: 0 }
+}
+
 /** Sync read with light mtime cache — safe for prompt guards and UI polls. */
 export function current(): Info {
-  const loaded = loadFromDisk()
-  if (!loaded) {
-    cache = undefined
-    return DEFAULT
-  }
-  if (cache && cache.path === loaded.path && cache.mtimeMs === loaded.mtimeMs) {
+  const org = loadOrgFromDisk()
+  const overlay = loadUserOverlay()
+  const base = org?.info ?? DEFAULT
+  const info: Info = overlay.priority
+    ? { ...base, codingImagePriority: overlay.priority }
+    : base
+
+  if (
+    cache &&
+    cache.orgPath === (org?.path ?? "") &&
+    cache.orgMtimeMs === (org?.mtimeMs ?? 0) &&
+    cache.userPath === overlay.path &&
+    cache.userMtimeMs === overlay.mtimeMs
+  ) {
     return cache.info
   }
-  cache = { path: loaded.path, mtimeMs: loaded.mtimeMs, info: loaded.info }
-  return loaded.info
+
+  cache = {
+    orgPath: org?.path ?? "",
+    orgMtimeMs: org?.mtimeMs ?? 0,
+    userPath: overlay.path,
+    userMtimeMs: overlay.mtimeMs,
+    info,
+  }
+  return info
 }
 
 export function isRestricted(): boolean {

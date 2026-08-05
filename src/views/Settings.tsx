@@ -217,6 +217,9 @@ export function Settings() {
   const [creatingServerProject, setCreatingServerProject] = useState(false);
   const [openCodeStatus, setOpenCodeStatus] = useState<api.OpenCodeBundleStatus | null>(null);
   const [openCodeBusy, setOpenCodeBusy] = useState(false);
+  const [imagePriorityPref, setImagePriorityPref] =
+    useState<api.CodingImagePriorityPref>("default");
+  const [imagePrioritySaving, setImagePrioritySaving] = useState(false);
 
   const refreshOpenCodeStatus = useCallback(async () => {
     try {
@@ -230,6 +233,28 @@ export function Settings() {
   useEffect(() => {
     void refreshOpenCodeStatus();
   }, [refreshOpenCodeStatus]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setImagePriorityPref("default");
+      return;
+    }
+    void api.getUserCodingImagePriority(user.id).then(setImagePriorityPref);
+  }, [user?.id]);
+
+  const handleImagePriorityPref = async (pref: api.CodingImagePriorityPref) => {
+    if (!user?.id) return;
+    setImagePrioritySaving(true);
+    try {
+      await api.setUserCodingImagePriority(user.id, pref);
+      setImagePriorityPref(pref);
+      toast.success(t("settings.imagePrioritySaved"));
+    } catch (e) {
+      toast.error(getErrorMessage(e, t("common.error")));
+    } finally {
+      setImagePrioritySaving(false);
+    }
+  };
 
   const handleInstallBundledOpenCode = async () => {
     setOpenCodeBusy(true);
@@ -247,7 +272,7 @@ export function Settings() {
   const handleOpenOpenCode = async () => {
     setOpenCodeBusy(true);
     try {
-      await api.syncOpenCodeOrgConfigFromServer(serverApiUrl, getStoredToken());
+      await api.syncOpenCodeOrgConfigFromServer(serverApiUrl, getStoredToken(), user?.id);
       await api.openOpenCodeEditorFresh(null);
       toast.success(t("settings.openCode.opened"));
     } catch (e) {
@@ -1864,6 +1889,37 @@ export function Settings() {
                   <LogOut className="w-3 h-3" />
                   {t("auth.signOut")}
                 </button>
+              </div>
+            )}
+            {isAuthenticated && user && (
+              <div className="px-4 py-3 border-t border-border">
+                <h3 className="text-[13px] text-secondary font-medium mb-0.5">
+                  {t("settings.imagePriority")}
+                </h3>
+                <p className="text-[13px] text-muted mb-3">{t("settings.imagePriorityDesc")}</p>
+                <div className="flex flex-col gap-2">
+                  {(
+                    [
+                      ["default", "imagePriorityDefault"],
+                      ["ocr_then_vl", "imagePriorityOcrThenVl"],
+                      ["vl_then_ocr", "imagePriorityVlThenOcr"],
+                      ["ocr_only", "imagePriorityOcrOnly"],
+                      ["vl_only", "imagePriorityVlOnly"],
+                    ] as const
+                  ).map(([value, labelKey]) => (
+                    <label key={value} className="flex items-start gap-2 text-sm cursor-pointer">
+                      <input
+                        type="radio"
+                        name="user-coding-image-priority"
+                        className="mt-1"
+                        checked={imagePriorityPref === value}
+                        disabled={imagePrioritySaving}
+                        onChange={() => void handleImagePriorityPref(value)}
+                      />
+                      <span className="text-primary">{t(`settings.${labelKey}`)}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
             )}
             {isAuthenticated && projects.length > 0 && (

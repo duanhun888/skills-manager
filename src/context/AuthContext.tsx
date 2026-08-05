@@ -111,13 +111,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 "permissions"
               ).catch(() => setPermissions([]));
             }
-            void api.syncOpenCodeOrgConfigFromServer(savedUrl, token);
+            void api.syncOpenCodeOrgConfigFromServer(savedUrl, token, me.id);
           } catch {
             setStoredToken(null);
             if (!cancelled) {
               setUser(null);
               setPermissions([]);
             }
+            void api.applyUserCodingImagePriorityToOpenCode(null);
           }
         }
       } catch (err) {
@@ -157,7 +158,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setStoredToken(result.access_token);
       setUser(result.user);
       await loadPermissions(serverApiUrl, result.access_token);
-      void api.syncOpenCodeOrgConfigFromServer(serverApiUrl, result.access_token);
+      void api.syncOpenCodeOrgConfigFromServer(
+        serverApiUrl,
+        result.access_token,
+        result.user.id
+      );
     },
     [serverApiUrl, loadPermissions]
   );
@@ -166,6 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStoredToken(null);
     setUser(null);
     setPermissions([]);
+    void api.applyUserCodingImagePriorityToOpenCode(null);
   }, []);
 
   const can = useCallback(

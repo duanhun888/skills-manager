@@ -99,6 +99,8 @@ export interface ServerPublicConfig {
   model_policy_mode?: "open" | "restricted" | string;
   requirements_only_models?: string[];
   coding_vision_model?: string | null;
+  coding_ocr_url?: string | null;
+  coding_image_priority?: string | null;
 }
 
 export class ServerApiError extends Error {
@@ -351,6 +353,8 @@ export async function updateServerModelPolicy(
     mode: "open" | "restricted";
     requirements_only_models?: string[];
     coding_vision_model?: string;
+    coding_ocr_url?: string;
+    coding_image_priority?: string;
   }
 ): Promise<ServerPublicConfig> {
   const base = normalizeBaseUrl(baseUrl);

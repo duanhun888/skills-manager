@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.4.13] - 2026-08-05
+
+### Release Overview
+- Coding-area screenshots: configurable OCR / VL priority
+
+### User-facing
+- Skills model policy adds **编码区 OCR 服务** and **识图优先级** (org default)
+- Accounts can override priority under **Settings → My coding image priority** (default = follow org); e.g. VL-first for accounts that must use the vision model
+- Priority options: OCR→VL, VL→OCR, OCR only, VL only
+- Toasts distinguish OCR vs VL; follow-up text marks `[截图识别]` source
+
+### Developer & Governance
+- Policy fields: `coding_ocr_url`, `coding_image_priority`; per-user overlay file `skills-model-user-policy.json` (SkillStore keyed by user id)
+- Admin save writes local OpenCode policy even if central server ignores new fields
+
 ## [1.4.12] - 2026-08-04
 
 ### Release Overview

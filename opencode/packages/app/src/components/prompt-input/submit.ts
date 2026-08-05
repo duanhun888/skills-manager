@@ -23,12 +23,14 @@ import {
   visionDescribeMode,
   visionDescribeSystem,
 } from "./coding-vision"
+import { ocrImages } from "./coding-ocr"
 import { setCursorPosition } from "./editor-dom"
 import { formatServerError } from "@/utils/server-errors"
 import { ScopedKey } from "@/utils/server-scope"
 import { createPromptSubmissionState } from "./submission-state"
 import {
   modelSupportsImages,
+  parseCodingImagePriority,
   parseProviderModel,
   useSkillsModelPolicy,
 } from "@/utils/skills-model-policy"
@@ -55,11 +57,18 @@ export type FollowupDraft = {
 }
 
 export type FollowupVisionDescribe = {
-  visionModel: { providerID: string; modelID: string }
+  visionModel?: { providerID: string; modelID: string }
+  /** Optional PaddleX OCR base URL, e.g. http://192.168.1.230:8080 */
+  ocrUrl?: string
+  /** Pipeline order when both OCR and VL are available. Default: ocr_then_vl */
+  priority?: "ocr_then_vl" | "vl_then_ocr" | "ocr_only" | "vl_only"
   /** When true, skip two-pass (coding model can see images). */
   codingSupportsImages: boolean
   locale: string
   onDescribeStart?: () => void
+  onOcrStart?: () => void
+  onOcrFallbackVision?: () => void
+  onVisionFallbackOcr?: () => void
 }
 
 type FollowupSendInput = {
@@ -85,6 +94,11 @@ async function resolveVisionDescription(input: {
   text: string
   vision: FollowupVisionDescribe
 }) {
+  const model = input.vision.visionModel
+  if (!model?.providerID || !model.modelID) {
+    throw new Error("vision model not configured")
+  }
+
   const visionMessageID = Identifier.ascending("message")
   const visionText = buildVisionDescribeUserText(input.text, input.vision.locale)
   const { requestParts } = buildRequestParts({
@@ -101,8 +115,8 @@ async function resolveVisionDescription(input: {
     sessionID: input.draft.sessionID,
     agent: "requirements",
     model: {
-      providerID: input.vision.visionModel.providerID,
-      modelID: input.vision.visionModel.modelID,
+      providerID: model.providerID,
+      modelID: model.modelID,
     },
     system: visionDescribeSystem(visionDescribeMode(input.text)),
     parts: requestParts,
@@ -126,6 +140,71 @@ async function resolveVisionDescription(input: {
   return description
 }
 
+/** Pass1: describe images via OCR and/or VL according to configured priority. */
+async function resolveImageDescription(input: {
+  client: DirectorySDK["client"]
+  draft: FollowupDraft
+  images: ImageAttachmentPart[]
+  text: string
+  vision: FollowupVisionDescribe
+}): Promise<{ text: string; source: "ocr" | "vl" }> {
+  const ocrUrl = input.vision.ocrUrl?.trim()
+  const visionReady = !!input.vision.visionModel?.providerID && !!input.vision.visionModel?.modelID
+  const priority = input.vision.priority ?? "ocr_then_vl"
+
+  const runOcr = async (): Promise<{ text: string; source: "ocr" } | { ok: false; reason: string }> => {
+    if (!ocrUrl) return { ok: false, reason: "no_endpoint" }
+    input.vision.onOcrStart?.()
+    const ocr = await ocrImages({
+      endpoint: ocrUrl,
+      dataUrls: input.images.map((image) => image.dataUrl),
+    })
+    if (ocr.ok) return { text: ocr.text, source: "ocr" }
+    return { ok: false, reason: ocr.reason }
+  }
+
+  const runVl = async (): Promise<{ text: string; source: "vl" } | { ok: false; reason: string }> => {
+    if (!visionReady) return { ok: false, reason: "no_vision_model" }
+    input.vision.onDescribeStart?.()
+    const description = await resolveVisionDescription(input)
+    if (!description) return { ok: false, reason: "empty" }
+    return { text: description, source: "vl" }
+  }
+
+  if (priority === "ocr_only") {
+    const ocr = await runOcr()
+    if ("source" in ocr) return ocr
+    throw new Error(`OCR failed (${ocr.reason})`)
+  }
+
+  if (priority === "vl_only") {
+    const vl = await runVl()
+    if ("source" in vl) return vl
+    throw new Error(`vision describe failed (${vl.reason})`)
+  }
+
+  if (priority === "vl_then_ocr") {
+    const vl = await runVl()
+    if ("source" in vl) return vl
+    if (!ocrUrl) throw new Error(`vision describe failed (${vl.reason}) and no OCR configured`)
+    input.vision.onVisionFallbackOcr?.()
+    const ocr = await runOcr()
+    if ("source" in ocr) return ocr
+    throw new Error(`vision and OCR both failed (vl=${vl.reason}, ocr=${ocr.reason})`)
+  }
+
+  // ocr_then_vl (default)
+  if (ocrUrl) {
+    const ocr = await runOcr()
+    if ("source" in ocr) return ocr
+    if (!visionReady) throw new Error(`OCR failed (${ocr.reason}) and no vision model configured`)
+    input.vision.onOcrFallbackVision?.()
+  }
+  const vl = await runVl()
+  if ("source" in vl) return vl
+  throw new Error(`vision describe failed (${vl.reason})`)
+}
+
 export async function sendFollowupDraft(input: FollowupSendInput) {
   const text = draftText(input.draft.prompt)
   const images = draftImages(input.draft.prompt)
@@ -147,10 +226,19 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
 
   const [head, ...tail] = text.split(" ")
   const cmd = head?.startsWith("/") ? head.slice(1) : undefined
+  const ocrReady = !!input.vision?.ocrUrl?.trim()
+  const visionReady =
+    !!input.vision?.visionModel?.providerID && !!input.vision?.visionModel?.modelID
+  const priority = input.vision?.priority ?? "ocr_then_vl"
+  const pipelineReady =
+    (priority === "ocr_only" && ocrReady) ||
+    (priority === "vl_only" && visionReady) ||
+    (priority !== "ocr_only" && priority !== "vl_only" && (ocrReady || visionReady))
   const shouldDescribe =
     !!input.vision &&
     !input.vision.codingSupportsImages &&
     images.length > 0 &&
+    pipelineReady &&
     !(cmd && input.sync.data.command.find((item) => item.name === cmd))
 
   if (shouldDescribe && input.vision) {
@@ -160,19 +248,19 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
         setIdle()
         return false
       }
-      input.vision.onDescribeStart?.()
-      const description = await resolveVisionDescription({
+      const described = await resolveImageDescription({
         client: input.client,
         draft: input.draft,
         images,
         text,
         vision: input.vision,
       })
-      if (!description) {
-        setIdle()
-        throw new Error("vision describe returned empty")
-      }
-      const codingText = buildCodingFollowupText(text, description, input.vision.locale)
+      const codingText = buildCodingFollowupText(
+        text,
+        described.text,
+        input.vision.locale,
+        described.source,
+      )
       return await sendFollowupDraft({
         ...input,
         draft: {
@@ -687,14 +775,22 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       return true
     }
 
-    const visionModel = parseProviderModel(skillsPolicy.policy().coding_vision_model)
+    const policy = skillsPolicy.policy()
+    const visionModel = parseProviderModel(policy.coding_vision_model)
+    const ocrUrl = policy.coding_ocr_url?.trim() || undefined
+    const priority = parseCodingImagePriority(policy.coding_image_priority)
     const needsVision =
       mode === "normal" &&
       images.length > 0 &&
       !modelSupportsImages(currentModel) &&
       !text.startsWith("/")
 
-    if (needsVision && !visionModel) {
+    const pipelineReady =
+      (priority === "ocr_only" && !!ocrUrl) ||
+      (priority === "vl_only" && !!visionModel) ||
+      (priority !== "ocr_only" && priority !== "vl_only" && (!!ocrUrl || !!visionModel))
+
+    if (needsVision && !pipelineReady) {
       showToast({
         title: language.t("prompt.toast.visionModelRequired.title"),
         description: language.t("prompt.toast.visionModelRequired.description"),
@@ -702,11 +798,31 @@ export function createPromptSubmit(input: PromptSubmitInput) {
     }
 
     const vision =
-      needsVision && visionModel
+      needsVision && pipelineReady
         ? {
             visionModel,
+            ocrUrl,
+            priority,
             codingSupportsImages: false,
             locale: language.locale(),
+            onOcrStart: () => {
+              showToast({
+                title: language.t("prompt.toast.ocrStart.title"),
+                description: language.t("prompt.toast.ocrStart.description"),
+              })
+            },
+            onOcrFallbackVision: () => {
+              showToast({
+                title: language.t("prompt.toast.ocrFallbackVision.title"),
+                description: language.t("prompt.toast.ocrFallbackVision.description"),
+              })
+            },
+            onVisionFallbackOcr: () => {
+              showToast({
+                title: language.t("prompt.toast.visionFallbackOcr.title"),
+                description: language.t("prompt.toast.visionFallbackOcr.description"),
+              })
+            },
             onDescribeStart: () => {
               showToast({
                 title: language.t("prompt.toast.visionDescribe.title"),
