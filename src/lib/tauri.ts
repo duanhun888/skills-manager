@@ -403,12 +403,33 @@ export async function syncOpenCodeModelPolicyFromServer(
   try {
     const { fetchServerPublicConfig } = await import("./serverApi");
     const cfg = await fetchServerPublicConfig(base);
+    // Central server may not persist OCR/priority yet — keep last admin-saved values.
+    const cachedOcr = (await getSettings("org_coding_ocr_url").catch(() => null))?.trim() || "";
+    const cachedPriority =
+      (await getSettings("org_coding_image_priority").catch(() => null))?.trim() || "";
+    const ocr =
+      (typeof cfg.coding_ocr_url === "string" && cfg.coding_ocr_url.trim()) ||
+      cachedOcr ||
+      null;
+    const priority =
+      (typeof cfg.coding_image_priority === "string" &&
+        cfg.coding_image_priority.trim()) ||
+      cachedPriority ||
+      null;
+    if (typeof cfg.coding_ocr_url === "string" && cfg.coding_ocr_url.trim()) {
+      await setSettings("org_coding_ocr_url", cfg.coding_ocr_url.trim()).catch(() => {});
+    }
+    if (typeof cfg.coding_image_priority === "string" && cfg.coding_image_priority.trim()) {
+      await setSettings("org_coding_image_priority", cfg.coding_image_priority.trim()).catch(
+        () => {}
+      );
+    }
     await syncOpenCodeModelPolicy({
       mode: cfg.model_policy_mode === "restricted" ? "restricted" : "open",
       requirements_only_models: cfg.requirements_only_models ?? [],
       coding_vision_model: cfg.coding_vision_model?.trim() || null,
-      coding_ocr_url: cfg.coding_ocr_url?.trim() || null,
-      coding_image_priority: cfg.coding_image_priority?.trim() || null,
+      coding_ocr_url: ocr,
+      coding_image_priority: priority,
     });
   } catch {
     // Offline / no server — leave existing local policy file untouched.

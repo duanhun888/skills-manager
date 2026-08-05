@@ -9,7 +9,7 @@ import {
   updateServerModelPolicy,
   userIsOps,
 } from "../lib/serverApi";
-import { syncOpenCodeModelPolicy } from "../lib/tauri";
+import { setSettings, syncOpenCodeModelPolicy } from "../lib/tauri";
 import { getErrorMessage } from "../lib/error";
 
 type PolicyMode = "open" | "restricted";
@@ -83,11 +83,13 @@ export function AdminModelPolicy() {
         coding_ocr_url: codingOcrUrl.trim(),
         coding_image_priority: imagePriority,
       });
+      await setSettings("org_coding_ocr_url", codingOcrUrl.trim()).catch(() => {});
+      await setSettings("org_coding_image_priority", imagePriority).catch(() => {});
       await syncOpenCodeModelPolicy({
         mode: cfg.model_policy_mode === "restricted" ? "restricted" : "open",
         requirements_only_models: cfg.requirements_only_models ?? models,
         coding_vision_model: cfg.coding_vision_model?.trim() || codingVisionModel.trim() || null,
-        coding_ocr_url: cfg.coding_ocr_url?.trim() || codingOcrUrl.trim() || null,
+        coding_ocr_url: codingOcrUrl.trim() || cfg.coding_ocr_url?.trim() || null,
         coding_image_priority: imagePriority,
       });
       toast.success(t("admin.policy.saved"));

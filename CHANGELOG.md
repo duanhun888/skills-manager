@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.14] - 2026-08-05
+
+### Release Overview
+- Keep coding OCR URL when central server does not persist it yet
+
+### User-facing
+- Saving Model policy with an OCR address no longer gets wiped to empty when Skills later syncs org config from an older central server
+- Admin save caches OCR URL / image priority locally for OpenCode
+
+### Developer & Governance
+- `syncOpenCodeModelPolicyFromServer` merges SkillStore cache when server omits `coding_ocr_url` / `coding_image_priority`
+
 ## [1.4.13] - 2026-08-05
 
 ### Release Overview

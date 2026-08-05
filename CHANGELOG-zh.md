@@ -1,5 +1,17 @@
 # Changelog (zh)
 
+## [1.4.14] - 2026-08-05
+
+### 发布概览
+- 中央服务尚未持久化 OCR 地址时，不再冲掉本机已保存的编码区 OCR 配置
+
+### 用户可见更新
+- 模型策略保存 OCR 地址后，后续从旧版中央同步组织配置时不会再被清空
+- 管理端保存会把 OCR 地址 / 识图优先级缓存到本机，供 OpenCode 使用
+
+### 开发者与治理更新
+- `syncOpenCodeModelPolicyFromServer` 在中央缺少 `coding_ocr_url` / `coding_image_priority` 时合并 SkillStore 缓存
+
 ## [1.4.13] - 2026-08-05
 
 ### 发布概览
