@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.15] - 2026-08-05
+
+### Release Overview
+- Keep admin OCR URL display after save when central config omits or returns a stale value
+
+### User-facing
+- Model policy OCR address no longer snaps back to the old server value after Save
+- Load prefers last locally saved OCR URL / image priority
+
+### Developer & Governance
+- AdminModelPolicy: cache-first OCR fields; do not reload form from server after save
+
 ## [1.4.14] - 2026-08-05
 
 ### Release Overview

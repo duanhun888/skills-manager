@@ -9,7 +9,7 @@ import {
   updateServerModelPolicy,
   userIsOps,
 } from "../lib/serverApi";
-import { setSettings, syncOpenCodeModelPolicy } from "../lib/tauri";
+import { getSettings, setSettings, syncOpenCodeModelPolicy } from "../lib/tauri";
 import { getErrorMessage } from "../lib/error";
 
 type PolicyMode = "open" | "restricted";
@@ -47,12 +47,17 @@ export function AdminModelPolicy() {
     setLoading(true);
     try {
       const cfg = await fetchServerPublicConfig(serverApiUrl);
+      // Central may omit or return stale OCR fields — prefer last admin-saved local cache.
+      const cachedOcr =
+        (await getSettings("org_coding_ocr_url").catch(() => null))?.trim() || "";
+      const cachedPriority =
+        (await getSettings("org_coding_image_priority").catch(() => null))?.trim() || "";
       setMode(cfg.model_policy_mode === "restricted" ? "restricted" : "open");
       const models = cfg.requirements_only_models ?? [];
       setModelsText(models.length > 0 ? models.join("\n") : DEFAULT_MODELS);
       setCodingVisionModel(cfg.coding_vision_model?.trim() || "");
-      setCodingOcrUrl(cfg.coding_ocr_url?.trim() || "");
-      setImagePriority(parseImagePriority(cfg.coding_image_priority));
+      setCodingOcrUrl(cachedOcr || cfg.coding_ocr_url?.trim() || "");
+      setImagePriority(parseImagePriority(cachedPriority || cfg.coding_image_priority));
     } catch (err) {
       toast.error(getErrorMessage(err, t("common.error")));
     } finally {
@@ -76,24 +81,27 @@ export function AdminModelPolicy() {
     }
     setSaving(true);
     try {
+      const ocrUrl = codingOcrUrl.trim();
       const cfg = await updateServerModelPolicy(serverApiUrl, token, {
         mode,
         requirements_only_models: models,
         coding_vision_model: codingVisionModel.trim(),
-        coding_ocr_url: codingOcrUrl.trim(),
+        coding_ocr_url: ocrUrl,
         coding_image_priority: imagePriority,
       });
-      await setSettings("org_coding_ocr_url", codingOcrUrl.trim()).catch(() => {});
+      await setSettings("org_coding_ocr_url", ocrUrl).catch(() => {});
       await setSettings("org_coding_image_priority", imagePriority).catch(() => {});
       await syncOpenCodeModelPolicy({
         mode: cfg.model_policy_mode === "restricted" ? "restricted" : "open",
         requirements_only_models: cfg.requirements_only_models ?? models,
         coding_vision_model: cfg.coding_vision_model?.trim() || codingVisionModel.trim() || null,
-        coding_ocr_url: codingOcrUrl.trim() || cfg.coding_ocr_url?.trim() || null,
+        coding_ocr_url: ocrUrl || null,
         coding_image_priority: imagePriority,
       });
+      // Keep the values just saved — server reload often cannot echo OCR yet.
+      setCodingOcrUrl(ocrUrl);
+      setImagePriority(imagePriority);
       toast.success(t("admin.policy.saved"));
-      await load();
     } catch (err) {
       toast.error(getErrorMessage(err, t("common.error")));
     } finally {
