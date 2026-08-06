@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.4.18] - 2026-08-06
+
+### Release Overview
+- Coding review diffs: denser Pierre styling plus Monaco DiffEditor for a VS Code-like read-only change preview
+
+### User-facing
+- Review / file-tab change previews use Monaco DiffEditor (split or unified) with compact 12px / 18px lines
+- Split view labels panes as before/after (full previous vs updated file) so red/green means aligned add/remove, not “deletes-only vs adds-only”
+- Timeline and media diffs stay on Pierre; pure text tabs without a diff are unchanged
+- Remaining Pierre diffs also use tighter line height and word-level highlighting
+
+### Developer & Governance
+- Add `monaco-editor` to session-ui with lazy load + Vite workers
+- `MonacoDiffPreview` wired into `SessionReviewFilePreviewV2` and `SessionFileViewV2` diff mode
+
 ## [1.4.17] - 2026-08-06
 
 ### Release Overview

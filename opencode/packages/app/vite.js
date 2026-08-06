@@ -34,6 +34,9 @@ export default [
         worker: {
           format: "es",
         },
+        optimizeDeps: {
+          include: ["monaco-editor"],
+        },
       }
     },
   },

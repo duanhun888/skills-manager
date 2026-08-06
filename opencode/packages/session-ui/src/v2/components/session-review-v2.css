@@ -251,7 +251,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 16px;
+  padding: 4px 12px;
   flex-shrink: 0;
   border-bottom: 1px solid var(--border-weaker-base, var(--v2-border-border-weak));
 }
@@ -354,6 +354,17 @@
   --line-comment-z: 5;
   --line-comment-popover-z: 30;
   --line-comment-open-z: 6;
+}
+
+[data-component="session-review-v2"] [data-slot="session-review-v2-diff-scroll"][data-monaco] {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+[data-component="session-review-v2"] [data-slot="session-review-v2-diff-scroll"][data-monaco] [data-component="monaco-diff-preview-root"] {
+  flex: 1;
+  min-height: 0;
 }
 
 [data-component="session-review-v2"] .session-review-v2-toolbar-group--segments {

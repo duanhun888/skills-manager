@@ -23,6 +23,7 @@ import type {
 import type { SessionReviewExpandMode } from "./session-review-v2"
 import { createLineCommentControllerV2 } from "./line-comment-annotations-v2"
 import { shouldVirtualizeReviewDiff } from "./session-review-file-preview-v2-virtualize"
+import { MonacoDiffPreview } from "../../monaco/diff-preview"
 import { LineCommentV2OverflowIcon } from "@opencode-ai/ui/v2/line-comment-v2"
 import { MenuV2 } from "@opencode-ai/ui/v2/menu-v2"
 import "./session-review-v2.css"
@@ -212,7 +213,7 @@ export function SessionReviewFilePreviewV2(props: SessionReviewFilePreviewV2Prop
 
   const expandUnchanged = () => props.expandMode === "expand"
 
-  const diffViewer = () => (
+  const pierreDiffViewer = () => (
     <Dynamic
       component={fileComponent}
       mode="diff"
@@ -250,6 +251,20 @@ export function SessionReviewFilePreviewV2(props: SessionReviewFilePreviewV2Prop
     />
   )
 
+  const monacoDiffViewer = () => {
+    const next = view()
+    return (
+      <MonacoDiffPreview
+        path={props.file}
+        original={text(next, "deletions")}
+        modified={text(next, "additions")}
+        diffStyle={props.diffStyle}
+      />
+    )
+  }
+
+  const diffViewer = () => (mediaKind() ? pierreDiffViewer() : monacoDiffViewer())
+
   return (
     <>
       <div data-slot="session-review-v2-file-header">
@@ -272,6 +287,7 @@ export function SessionReviewFilePreviewV2(props: SessionReviewFilePreviewV2Prop
           scrollRef = el
         }}
         data-slot="session-review-v2-diff-scroll"
+        data-monaco={!mediaKind() && diffCanRender() ? "" : undefined}
       >
         <Show
           when={diffCanRender() || mediaKind()}

@@ -14,8 +14,8 @@ export function createHoverCommentUtility(props: {
   button.type = "button"
   button.ariaLabel = props.label
   button.textContent = "+"
-  button.style.width = "20px"
-  button.style.height = "20px"
+  button.style.width = "16px"
+  button.style.height = "16px"
   button.style.display = "flex"
   button.style.alignItems = "center"
   button.style.justifyContent = "center"
@@ -24,12 +24,12 @@ export function createHoverCommentUtility(props: {
   button.style.background = "var(--icon-interactive-base)"
   button.style.color = "var(--white)"
   button.style.boxShadow = "var(--shadow-xs)"
-  button.style.fontSize = "14px"
+  button.style.fontSize = "12px"
   button.style.lineHeight = "1"
   button.style.cursor = "pointer"
   button.style.position = "relative"
   button.style.left = "30px"
-  button.style.top = "calc((var(--diffs-line-height, 24px) - 20px) / 2)"
+  button.style.top = "calc((var(--diffs-line-height, 18px) - 16px) / 2)"
 
   let line: HoverCommentLine | undefined
 

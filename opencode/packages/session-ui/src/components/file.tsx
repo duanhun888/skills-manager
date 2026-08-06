@@ -21,7 +21,7 @@ import { type PreloadFileDiffResult, type PreloadMultiFileDiffResult } from "@pi
 import { createMediaQuery } from "@solid-primitives/media"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { ComponentProps, createEffect, createMemo, createSignal, onCleanup, onMount, Show, splitProps } from "solid-js"
-import { createDefaultOptions, styleVariables } from "../pierre"
+import { createDefaultOptions, DIFF_LINE_HEIGHT_PX, styleVariables } from "../pierre"
 import { markCommentedDiffLines, markCommentedFileLines } from "../pierre/commented-lines"
 import { fixDiffSelection, findDiffSide, type DiffSelectionSide } from "../pierre/diff-selection"
 import { createFileFind } from "../pierre/file-find"
@@ -51,7 +51,7 @@ const VIRTUALIZE_BYTES = 500_000
 
 const codeMetrics = {
   ...DEFAULT_VIRTUAL_FILE_METRICS,
-  lineHeight: 24,
+  lineHeight: DIFF_LINE_HEIGHT_PX,
   spacing: 0,
 } satisfies Partial<VirtualFileMetrics>
 

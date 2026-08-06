@@ -1,4 +1,5 @@
 import { type VirtualFileMetrics, Virtualizer } from "@pierre/diffs"
+import { DIFF_LINE_HEIGHT_PX } from "./metrics"
 
 type Target = {
   key: Document | HTMLElement
@@ -14,8 +15,8 @@ type Entry = {
 const cache = new WeakMap<Document | HTMLElement, Entry>()
 
 export const virtualMetrics: Partial<VirtualFileMetrics> = {
-  lineHeight: 24,
-  hunkSeparatorHeight: 24,
+  lineHeight: DIFF_LINE_HEIGHT_PX,
+  hunkSeparatorHeight: DIFF_LINE_HEIGHT_PX,
   spacing: 0,
 }
 

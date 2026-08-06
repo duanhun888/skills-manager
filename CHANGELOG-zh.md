@@ -1,5 +1,20 @@
 # Changelog (zh)
 
+## [1.4.18] - 2026-08-06
+
+### 发布概览
+- 编码区变更预览：更紧凑的 Pierre 样式，并用 Monaco DiffEditor 提供接近 VS Code 的只读 diff
+
+### 用户可见更新
+- Review / 文件 Tab 的变更预览改用 Monaco DiffEditor（分栏或合并），字号 12、行高 18
+- 分栏顶部标明「改前 · 完整旧版 / 改后 · 完整新版」，红绿表示对齐处的增减，而非左右分别只堆删除/新增
+- 时间线内联 diff 与图片等媒体仍用 Pierre；无 diff 的纯文本预览不变
+- 仍走 Pierre 的 diff 也更密，并启用词级高亮
+
+### 开发者与治理更新
+- session-ui 增加 `monaco-editor`，懒加载 + Vite workers
+- `MonacoDiffPreview` 接入 `SessionReviewFilePreviewV2` 与 `SessionFileViewV2` 的 diff 模式
+
 ## [1.4.17] - 2026-08-06
 
 ### 发布概览

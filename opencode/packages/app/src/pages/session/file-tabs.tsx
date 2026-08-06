@@ -9,6 +9,8 @@ import { createLineCommentController } from "@opencode-ai/session-ui/line-commen
 import { createLineCommentControllerV2 } from "@opencode-ai/session-ui/v2/line-comment-annotations-v2"
 import { sampledChecksum } from "@opencode-ai/core/util/encode"
 import { normalize, text } from "@opencode-ai/session-ui/session-diff"
+import { MonacoDiffPreview } from "@opencode-ai/session-ui/monaco/diff-preview"
+import { mediaKindFromPath } from "@opencode-ai/session-ui/pierre/media"
 import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
 import { IconButton } from "@opencode-ai/ui/icon-button"
 import { LineCommentV2OverflowIcon } from "@opencode-ai/ui/v2/line-comment-v2"
@@ -820,18 +822,41 @@ function SessionFileViewV2(props: { tab: string; diff?: ReturnType<typeof normal
     </div>
   )
 
+  const mediaKind = createMemo(() => mediaKindFromPath(path()))
+  const monacoDiff = createMemo(() => {
+    const next = props.diff
+    if (!next || mediaKind()) return
+    return next
+  })
+
   const content = () => (
     <div class="mt-3 relative h-full min-h-0">
-      <ScrollView class="h-full" viewportRef={scrollSync.setViewport} onScroll={scrollSync.handleScroll as any}>
-        <Switch>
-          <Match when={props.diff}>{renderFile(contents())}</Match>
-          <Match when={state()?.loaded}>{renderFile(contents())}</Match>
-          <Match when={state()?.loading}>
-            <div class="px-6 py-4 text-text-weak">{language.t("common.loading")}...</div>
-          </Match>
-          <Match when={state()?.error}>{(err) => <div class="px-6 py-4 text-text-weak">{err()}</div>}</Match>
-        </Switch>
-      </ScrollView>
+      <Show
+        when={monacoDiff()}
+        fallback={
+          <ScrollView class="h-full" viewportRef={scrollSync.setViewport} onScroll={scrollSync.handleScroll as any}>
+            <Switch>
+              <Match when={props.diff}>{renderFile(contents())}</Match>
+              <Match when={state()?.loaded}>{renderFile(contents())}</Match>
+              <Match when={state()?.loading}>
+                <div class="px-6 py-4 text-text-weak">{language.t("common.loading")}...</div>
+              </Match>
+              <Match when={state()?.error}>{(err) => <div class="px-6 py-4 text-text-weak">{err()}</div>}</Match>
+            </Switch>
+          </ScrollView>
+        }
+      >
+        {(diff) => (
+          <div class="h-full min-h-0">
+            <MonacoDiffPreview
+              path={path() ?? props.tab}
+              original={text(diff(), "deletions")}
+              modified={text(diff(), "additions")}
+              diffStyle={layout.review.diffStyle()}
+            />
+          </div>
+        )}
+      </Show>
     </div>
   )
 

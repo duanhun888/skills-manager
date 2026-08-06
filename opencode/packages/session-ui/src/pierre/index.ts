@@ -1,6 +1,9 @@
 import { DiffLineAnnotation, FileContents, FileDiffOptions, type SelectedLineRange } from "@pierre/diffs"
 import { ComponentProps } from "solid-js"
 import { lineCommentStyles } from "../components/line-comment-styles"
+import { DIFF_LINE_HEIGHT_PX } from "./metrics"
+
+export { DIFF_LINE_HEIGHT_PX } from "./metrics"
 
 export type DiffProps<T = {}> = FileDiffOptions<T> & {
   before: FileContents
@@ -130,7 +133,7 @@ const unsafeCSS = `
 [data-diff],
 [data-file] {
   [data-separator] {
-    height: 24px;
+    height: var(--diffs-line-height, 18px);
   }
   [data-column-number] {
     background-color: var(--diffs-bg);
@@ -166,7 +169,8 @@ export function createDefaultOptions<T>(style: FileDiffOptions<T>["diffStyle"]) 
     disableBackground: false,
     expansionLineCount: 20,
     hunkSeparators: "line-info-basic",
-    lineDiffType: style === "split" ? "word-alt" : "none",
+    // Word-level inline diffs read closer to VS Code than whole-line wash only.
+    lineDiffType: "word-alt",
     maxLineDiffLength: 1000,
     maxLineLengthForHighlighting: 1000,
     disableFileHeader: true,
@@ -176,11 +180,12 @@ export function createDefaultOptions<T>(style: FileDiffOptions<T>["diffStyle"]) 
 
 export const styleVariables = {
   "--diffs-font-family": "var(--font-family-mono)",
-  "--diffs-font-size": "var(--font-size-small)",
-  "--diffs-line-height": "24px",
+  "--diffs-font-size": "12px",
+  "--diffs-line-height": `${DIFF_LINE_HEIGHT_PX}px`,
   "--diffs-tab-size": 2,
   "--diffs-font-features": "var(--font-family-mono--font-feature-settings)",
   "--diffs-header-font-family": "var(--font-family-sans)",
   "--diffs-gap-block": 0,
-  "--diffs-min-number-column-width": "4ch",
+  "--diffs-gap-inline": "4px",
+  "--diffs-min-number-column-width": "3ch",
 }
