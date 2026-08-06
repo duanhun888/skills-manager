@@ -693,6 +693,8 @@ export const dict = {
   "session.header.openIn": "打开方式",
   "session.header.open.action": "打开 {{app}}",
   "session.header.open.ariaLabel": "在 {{app}} 中打开",
+  "session.header.open.file.ariaLabel": "在 {{app}} 中打开当前文件",
+  "session.header.open.projectFolder": "打开项目文件夹",
   "session.header.open.menu": "打开选项",
   "session.header.open.copyPath": "复制路径",
 
@@ -800,7 +802,7 @@ export const dict = {
   "settings.general.row.followup.option.queue": "排队",
   "settings.general.row.followup.option.steer": "引导",
   "settings.general.row.showFileTree.title": "文件树",
-  "settings.general.row.showFileTree.description": "在会话中显示文件树面板",
+  "settings.general.row.showFileTree.description": "默认在会话中显示文件树，便于浏览与预览文件",
   "settings.general.row.fileTreePosition.title": "文件树位置",
   "settings.general.row.fileTreePosition.description": "将会话文件树放在聊天左侧或右侧",
   "settings.general.row.fileTreePosition.option.left": "左侧",

@@ -63,6 +63,63 @@ function unquoteGitPath(input: string) {
   return Buffer.from(bytes).toString()
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value)
+}
+
+/** When shadow-git snapshots are empty/unavailable, recover diffs from tool metadata. */
+function diffsFromToolParts(messages: SessionV1.WithParts[]): Snapshot.FileDiff[] {
+  const byFile = new Map<string, Snapshot.FileDiff>()
+
+  for (const item of messages) {
+    if (item.info.role !== "assistant") continue
+    for (const part of item.parts) {
+      if (part.type !== "tool") continue
+      if (part.state.status !== "completed") continue
+      const metadata = part.state.metadata
+      if (!isRecord(metadata)) continue
+
+      const filediff = metadata.filediff
+      if (isRecord(filediff) && typeof filediff.file === "string" && typeof filediff.patch === "string") {
+        byFile.set(filediff.file, {
+          file: filediff.file,
+          patch: filediff.patch,
+          additions: typeof filediff.additions === "number" ? filediff.additions : 0,
+          deletions: typeof filediff.deletions === "number" ? filediff.deletions : 0,
+          status:
+            filediff.status === "added" || filediff.status === "deleted" || filediff.status === "modified"
+              ? filediff.status
+              : undefined,
+        })
+        continue
+      }
+
+      if (!Array.isArray(metadata.files)) continue
+      for (const raw of metadata.files) {
+        if (!isRecord(raw)) continue
+        const file =
+          typeof raw.relativePath === "string"
+            ? raw.relativePath
+            : typeof raw.filePath === "string"
+              ? raw.filePath
+              : undefined
+        const patch = typeof raw.patch === "string" ? raw.patch : typeof raw.diff === "string" ? raw.diff : undefined
+        if (!file || typeof patch !== "string") continue
+        const status = raw.type === "add" ? "added" : raw.type === "delete" ? "deleted" : "modified"
+        byFile.set(file, {
+          file,
+          patch,
+          additions: typeof raw.additions === "number" ? raw.additions : 0,
+          deletions: typeof raw.deletions === "number" ? raw.deletions : 0,
+          status,
+        })
+      }
+    }
+  }
+
+  return Array.from(byFile.values())
+}
+
 export interface Interface {
   readonly summarize: (input: { sessionID: SessionID; messageID: MessageID }) => Effect.Effect<void>
   readonly diff: (input: { sessionID: SessionID; messageID?: MessageID }) => Effect.Effect<Snapshot.FileDiff[]>
@@ -95,8 +152,11 @@ const layer = Layer.effect(
           if (part.type === "step-finish" && part.snapshot) to = part.snapshot
         }
       }
-      if (from && to) return yield* snapshot.diffFull(from, to)
-      return []
+      if (from && to) {
+        const full = yield* snapshot.diffFull(from, to)
+        if (full.length) return full
+      }
+      return diffsFromToolParts(input.messages)
     })
 
     const summarize = Effect.fn("SessionSummary.summarize")(function* (input: {
@@ -112,7 +172,6 @@ const layer = Layer.effect(
         },
       })
       yield* events.publish(Session.Event.Diff, { sessionID: input.sessionID, diff: [] })
-      if ((yield* config.get()).snapshot === false) return
       const all = yield* sessions.messages({ sessionID: input.sessionID }).pipe(Effect.orDie)
       if (!all.length) return
 
@@ -121,9 +180,25 @@ const layer = Layer.effect(
       )
       const target = messages.find((m) => m.info.id === input.messageID)
       if (!target || target.info.role !== "user") return
-      const msgDiffs = yield* computeDiff({ messages })
-      target.info.summary = { ...target.info.summary, diffs: msgDiffs }
+
+      const snapshotEnabled = (yield* config.get()).snapshot !== false
+      const msgDiffs = snapshotEnabled ? yield* computeDiff({ messages }) : diffsFromToolParts(messages)
+      const additions = msgDiffs.reduce((sum, item) => sum + item.additions, 0)
+      const deletions = msgDiffs.reduce((sum, item) => sum + item.deletions, 0)
+      target.info.summary = {
+        ...target.info.summary,
+        diffs: msgDiffs,
+      }
       yield* sessions.updateMessage(target.info)
+      yield* sessions.setSummary({
+        sessionID: input.sessionID,
+        summary: {
+          additions,
+          deletions,
+          files: msgDiffs.length,
+        },
+      })
+      yield* events.publish(Session.Event.Diff, { sessionID: input.sessionID, diff: msgDiffs })
     })
 
     const diff = Effect.fn("SessionSummary.diff")(function* (input: { sessionID: SessionID; messageID?: MessageID }) {

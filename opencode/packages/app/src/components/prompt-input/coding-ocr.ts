@@ -66,9 +66,14 @@ export function isOcrUseful(input: { texts: string[]; scores: number[] }): Codin
   const lineCount = lines.length
   const avgScore =
     input.scores.length > 0 ? input.scores.reduce((a, b) => a + b, 0) / input.scores.length : 1
+  const compact = text.replace(/\s+/g, "")
+  // CJK glyphs are denser than Latin; count each Han char twice so short logos
+  // like "跨境AI专家" (6 code units) still pass the minimum useful-length gate.
+  const han = [...compact].filter((ch) => /\p{Script=Han}/u.test(ch)).length
+  const effectiveLen = compact.length + han
 
   if (!text) return { ok: false, reason: "empty" }
-  if (text.replace(/\s+/g, "").length < 8) return { ok: false, reason: "too_short" }
+  if (effectiveLen < 8) return { ok: false, reason: "too_short" }
   if (lineCount === 0) return { ok: false, reason: "no_lines" }
   if (input.scores.length > 0 && avgScore < 0.45) return { ok: false, reason: "low_confidence" }
   // Many low-confidence fragments → likely UI/noise rather than readable error text.
@@ -80,15 +85,27 @@ export function isOcrUseful(input: { texts: string[]; scores: number[] }): Codin
   return { ok: true, text, avgScore, lineCount }
 }
 
+function ocrLog(level: "info" | "warn", message: string, detail?: Record<string, unknown>) {
+  const payload = detail ? { ...detail } : undefined
+  if (level === "warn") console.warn(`[coding-ocr] ${message}`, payload ?? "")
+  else console.info(`[coding-ocr] ${message}`, payload ?? "")
+}
+
 export async function ocrImageBase64(input: {
   endpoint: string
   base64: string
   signal?: AbortSignal
 }): Promise<CodingOcrResult> {
   const endpoint = input.endpoint.trim().replace(/\/+$/, "")
-  if (!endpoint) return { ok: false, reason: "no_endpoint" }
+  if (!endpoint) {
+    ocrLog("warn", "skip: no endpoint")
+    return { ok: false, reason: "no_endpoint" }
+  }
 
   const url = /\/ocr$/i.test(endpoint) ? endpoint : `${endpoint}/ocr`
+  const bytes = stripDataUrl(input.base64).length
+  ocrLog("info", "POST start", { url, base64Chars: bytes })
+
   let res: Response
   try {
     res = await fetch(url, {
@@ -101,31 +118,53 @@ export async function ocrImageBase64(input: {
       }),
       signal: input.signal,
     })
-  } catch {
+  } catch (error) {
+    ocrLog("warn", "network error", {
+      url,
+      error: error instanceof Error ? error.message : String(error),
+    })
     return { ok: false, reason: "network" }
   }
 
-  if (!res.ok) return { ok: false, reason: `http_${res.status}` }
+  if (!res.ok) {
+    ocrLog("warn", "http error", { url, status: res.status })
+    return { ok: false, reason: `http_${res.status}` }
+  }
 
   let payload: unknown
   try {
     payload = await res.json()
   } catch {
+    ocrLog("warn", "bad json", { url })
     return { ok: false, reason: "bad_json" }
   }
 
   const root = asRecord(payload)
   const errorCode = root?.errorCode ?? root?.error_code
   if (typeof errorCode === "number" && errorCode !== 0) {
+    ocrLog("warn", "api errorCode", { url, errorCode })
     return { ok: false, reason: `error_${errorCode}` }
   }
   const errMsg = root?.errMsg ?? root?.errorMsg ?? root?.message
   if (typeof errMsg === "string" && errMsg && !/success/i.test(errMsg)) {
     // Some gateways use errMsg without numeric code.
-    if (/fail|error|invalid/i.test(errMsg)) return { ok: false, reason: "api_error" }
+    if (/fail|error|invalid/i.test(errMsg)) {
+      ocrLog("warn", "api errorMsg", { url, errMsg })
+      return { ok: false, reason: "api_error" }
+    }
   }
 
-  return isOcrUseful(collectTexts(payload))
+  const collected = collectTexts(payload)
+  const useful = isOcrUseful(collected)
+  ocrLog(useful.ok ? "info" : "warn", useful.ok ? "ok" : "rejected", {
+    url,
+    lineCount: collected.texts.length,
+    preview: collected.texts.slice(0, 3),
+    scores: collected.scores.slice(0, 5),
+    reason: useful.ok ? undefined : useful.reason,
+    textLen: useful.ok ? useful.text.replace(/\s+/g, "").length : 0,
+  })
+  return useful
 }
 
 export async function ocrImages(input: {

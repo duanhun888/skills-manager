@@ -1,4 +1,4 @@
-import { For, Show } from "solid-js"
+import { For, Show, createMemo } from "solid-js"
 import { AppIcon } from "@opencode-ai/ui/app-icon"
 import { Icon } from "@opencode-ai/ui/icon"
 import { Spinner } from "@opencode-ai/ui/spinner"
@@ -9,27 +9,47 @@ import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 import { useLanguage } from "@/context/language"
 import { type OpenApp, useOpenInApp } from "@/components/session/open-in-app"
 
-export function OpenInAppV2(props: { directory: () => string }) {
+export function OpenInAppV2(props: {
+  directory: () => string
+  /** Absolute path of the active preview file, when any. */
+  file?: () => string | undefined
+  /** 1-based line to jump to (vscode/cursor/zed). */
+  line?: () => number | undefined
+}) {
   const language = useLanguage()
-  const state = useOpenInApp(props)
+  const state = useOpenInApp({ directory: props.directory })
+  const activeFile = createMemo(() => props.file?.()?.trim() || undefined)
+  const activeLine = createMemo(() => {
+    const line = props.line?.()
+    return line !== undefined && line > 0 ? Math.floor(line) : undefined
+  })
+  const openTarget = (app: OpenApp | "finder") => {
+    const path = activeFile()
+    if (path) {
+      state.openFile(path, { app, line: activeLine() })
+      return
+    }
+    state.openDir(app)
+  }
+  const ariaLabel = createMemo(() => {
+    const app = state.current().label
+    if (activeFile()) return language.t("session.header.open.file.ariaLabel", { app })
+    return language.t("session.header.open.ariaLabel", { app })
+  })
 
   return (
     <Show when={props.directory() && state.canOpen()}>
       <SplitButtonV2 class="session-review-v2-open-in-app" onPointerDown={(event) => event.stopPropagation()}>
-        <TooltipV2
-          placement="bottom"
-          value={language.t("session.header.open.ariaLabel", { app: state.current().label })}
-          class="flex items-center"
-        >
+        <TooltipV2 placement="bottom" value={ariaLabel()} class="flex items-center">
           <SplitButtonV2Action
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => {
               event.stopPropagation()
               if (state.opening()) return
-              state.openDir(state.current().id)
+              openTarget(state.current().id)
             }}
             disabled={state.opening()}
-            aria-label={language.t("session.header.open.ariaLabel", { app: state.current().label })}
+            aria-label={ariaLabel()}
           >
             <Show when={state.opening()} fallback={<AppIcon id={state.current().icon} class="size-[18px]" />}>
               <Spinner class="size-3.5" />
@@ -69,7 +89,7 @@ export function OpenInAppV2(props: { directory: () => string }) {
                         onSelect={() => {
                           state.selectApp(option.id)
                           state.setMenu("open", false)
-                          state.openDir(option.id)
+                          openTarget(option.id)
                         }}
                       >
                         <AppIcon id={option.icon} />
@@ -79,11 +99,23 @@ export function OpenInAppV2(props: { directory: () => string }) {
                   </For>
                 </MenuV2.RadioGroup>
               </MenuV2.Group>
+              <Show when={activeFile()}>
+                <MenuV2.Separator />
+                <MenuV2.Item
+                  onSelect={() => {
+                    state.setMenu("open", false)
+                    state.openDir(state.current().id)
+                  }}
+                >
+                  <Icon name="folder" size="small" class="text-icon-weak" />
+                  {language.t("session.header.open.projectFolder")}
+                </MenuV2.Item>
+              </Show>
               <MenuV2.Separator />
               <MenuV2.Item
                 onSelect={() => {
                   state.setMenu("open", false)
-                  state.copyPath()
+                  state.copyPath(activeFile() ?? props.directory())
                 }}
               >
                 <Icon name="copy" size="small" class="text-icon-weak" />

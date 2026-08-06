@@ -67,7 +67,7 @@ export type FollowupVisionDescribe = {
   locale: string
   onDescribeStart?: () => void
   onOcrStart?: () => void
-  onOcrFallbackVision?: () => void
+  onOcrFallbackVision?: (reason?: string) => void
   onVisionFallbackOcr?: () => void
 }
 
@@ -155,11 +155,20 @@ async function resolveImageDescription(input: {
   const runOcr = async (): Promise<{ text: string; source: "ocr" } | { ok: false; reason: string }> => {
     if (!ocrUrl) return { ok: false, reason: "no_endpoint" }
     input.vision.onOcrStart?.()
+    console.info("[coding-ocr] pipeline start", {
+      endpoint: ocrUrl,
+      priority,
+      imageCount: input.images.length,
+    })
     const ocr = await ocrImages({
       endpoint: ocrUrl,
       dataUrls: input.images.map((image) => image.dataUrl),
     })
-    if (ocr.ok) return { text: ocr.text, source: "ocr" }
+    if (ocr.ok) {
+      console.info("[coding-ocr] pipeline ok", { lineCount: ocr.lineCount, avgScore: ocr.avgScore })
+      return { text: ocr.text, source: "ocr" }
+    }
+    console.warn("[coding-ocr] pipeline failed → may fallback VL", { reason: ocr.reason })
     return { ok: false, reason: ocr.reason }
   }
 
@@ -198,7 +207,7 @@ async function resolveImageDescription(input: {
     const ocr = await runOcr()
     if ("source" in ocr) return ocr
     if (!visionReady) throw new Error(`OCR failed (${ocr.reason}) and no vision model configured`)
-    input.vision.onOcrFallbackVision?.()
+    input.vision.onOcrFallbackVision?.(ocr.reason)
   }
   const vl = await runVl()
   if ("source" in vl) return vl
@@ -775,15 +784,19 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       return true
     }
 
-    const policy = skillsPolicy.policy()
-    const visionModel = parseProviderModel(policy.coding_vision_model)
-    const ocrUrl = policy.coding_ocr_url?.trim() || undefined
-    const priority = parseCodingImagePriority(policy.coding_image_priority)
     const needsVision =
       mode === "normal" &&
       images.length > 0 &&
       !modelSupportsImages(currentModel) &&
       !text.startsWith("/")
+
+    // Ensure this submit path sees the latest policy (hook instances can race).
+    if (needsVision) await skillsPolicy.refresh({ force: true })
+
+    const policy = skillsPolicy.policy()
+    const visionModel = parseProviderModel(policy.coding_vision_model)
+    const ocrUrl = policy.coding_ocr_url?.trim() || undefined
+    const priority = parseCodingImagePriority(policy.coding_image_priority)
 
     const pipelineReady =
       (priority === "ocr_only" && !!ocrUrl) ||
@@ -795,6 +808,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
         title: language.t("prompt.toast.visionModelRequired.title"),
         description: language.t("prompt.toast.visionModelRequired.description"),
       })
+      return
     }
 
     const vision =
@@ -811,10 +825,10 @@ export function createPromptSubmit(input: PromptSubmitInput) {
                 description: language.t("prompt.toast.ocrStart.description"),
               })
             },
-            onOcrFallbackVision: () => {
+            onOcrFallbackVision: (reason) => {
               showToast({
                 title: language.t("prompt.toast.ocrFallbackVision.title"),
-                description: language.t("prompt.toast.ocrFallbackVision.description"),
+                description: `${language.t("prompt.toast.ocrFallbackVision.description")}${reason ? ` [${reason}]` : ""}`,
               })
             },
             onVisionFallbackOcr: () => {

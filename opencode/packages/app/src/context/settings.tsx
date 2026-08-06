@@ -38,6 +38,8 @@ export interface Settings {
     layoutTransitionEligible?: boolean
     newInterfaceNoticeDismissed?: boolean
     shouldDisplayTabsToast?: boolean
+    /** One-shot: migrated old default showFileTree=false → true for coding preview UX. */
+    codingPreviewUx?: boolean
   }
   appearance: {
     fontSize: number
@@ -175,7 +177,7 @@ const defaultSettings: Settings = {
     autoSave: true,
     releaseNotes: true,
     followup: "steer",
-    showFileTree: false,
+    showFileTree: true,
     showNavigation: false,
     showSearch: false,
     showStatus: false,
@@ -220,7 +222,33 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
   gate: false,
   init: () => {
     const platform = usePlatform()
-    const [store, setStore, _, ready] = persisted("settings.v3", createStore<Settings>(defaultSettings))
+    const [store, setStore, _, ready] = persisted(
+      {
+        key: "settings.v3",
+        migrate(value: unknown) {
+          if (!value || typeof value !== "object" || Array.isArray(value)) return value
+          const root = value as Settings
+          const general = root.general
+          if (!general || typeof general !== "object") return value
+          if (general.codingPreviewUx === true) return value
+          return {
+            ...root,
+            general: {
+              ...general,
+              showFileTree: true,
+              codingPreviewUx: true,
+            },
+          }
+        },
+      },
+      createStore<Settings>({
+        ...defaultSettings,
+        general: {
+          ...defaultSettings.general,
+          codingPreviewUx: true,
+        },
+      }),
+    )
     const [launch, setLaunch, , launchReady] = persisted(
       "app-version.v1",
       createStore<{ version?: string }>({ version: undefined }),

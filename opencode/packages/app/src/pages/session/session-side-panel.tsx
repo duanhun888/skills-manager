@@ -662,7 +662,25 @@ export function SessionSidePanel(props: {
                             onPointerDown={(event) => event.stopPropagation()}
                             onClick={(event) => event.stopPropagation()}
                           >
-                            <OpenInAppV2 directory={projectDirectory} />
+                            <OpenInAppV2
+                              directory={projectDirectory}
+                              file={() => {
+                                const tab = activeTab()
+                                if (!tab || tab === "review" || tab === "empty" || tab === "context") return undefined
+                                if (tab === SESSION_OPEN_FILE_TAB) return undefined
+                                return file.pathFromTab(tab)
+                              }}
+                              line={() => {
+                                const tab = activeTab()
+                                if (!tab || tab === "review" || tab === "empty" || tab === "context") return undefined
+                                if (tab === SESSION_OPEN_FILE_TAB) return undefined
+                                const path = file.pathFromTab(tab)
+                                if (!path) return undefined
+                                const selected = file.selectedLines(path) as SelectedLineRange | null | undefined
+                                if (!selected) return undefined
+                                return Math.min(selected.start, selected.end)
+                              }}
+                            />
                           </div>
                         </div>
 

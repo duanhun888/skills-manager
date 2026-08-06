@@ -249,12 +249,12 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
     openLink(url: string) {
       window.api.openLink(url)
     },
-    async openPath(path: string, app?: string) {
+    async openPath(path: string, app?: string, line?: number) {
       if (os === "windows") {
         const resolvedApp = app ? await window.api.resolveAppPath(app).catch(() => null) : null
-        return window.api.openPath(path, resolvedApp ?? undefined)
+        return window.api.openPath(path, resolvedApp ?? undefined, line)
       }
-      return window.api.openPath(path, app)
+      return window.api.openPath(path, app, line)
     },
     async revealPath(path: string) {
       return window.api.revealPath(path)

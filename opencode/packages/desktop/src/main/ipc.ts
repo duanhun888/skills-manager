@@ -181,14 +181,39 @@ export function registerIpcHandlers(deps: Deps) {
     void shell.openExternal(url)
   })
 
-  ipcMain.handle("open-path", async (_event: IpcMainInvokeEvent, path: string, app?: string) => {
+  ipcMain.handle("open-path", async (_event: IpcMainInvokeEvent, path: string, app?: string, line?: number) => {
     if (!app) return shell.openPath(path)
+
+    const lineNumber = typeof line === "number" && Number.isFinite(line) && line > 0 ? Math.floor(line) : undefined
+    const goto = lineNumber !== undefined && editorSupportsGoto(app)
+
     await new Promise<void>((resolve, reject) => {
-      const [cmd, args] =
-        process.platform === "darwin" ? (["open", ["-a", app, path]] as const) : ([app, [path]] as const)
-      execFile(cmd, args, (err) => (err ? reject(err) : resolve()))
+      if (process.platform === "darwin") {
+        const args = goto ? (["-a", app, "--args", "-g", `${path}:${lineNumber}`] as const) : (["-a", app, path] as const)
+        execFile("open", [...args], (err) => (err ? reject(err) : resolve()))
+        return
+      }
+      const args = goto ? ["-g", `${path}:${lineNumber}`] : [path]
+      execFile(app, args, (err) => (err ? reject(err) : resolve()))
     })
   })
+
+  function editorSupportsGoto(app: string) {
+    const lower = app.toLowerCase().replace(/\\/g, "/")
+    const base = lower.split("/").pop() ?? lower
+    return (
+      base === "code" ||
+      base === "code.exe" ||
+      base === "cursor" ||
+      base === "cursor.exe" ||
+      base === "zed" ||
+      base === "zed.exe" ||
+      lower.includes("visual studio code") ||
+      // bare app name from macOS open -a
+      app === "Cursor" ||
+      app === "Zed"
+    )
+  }
 
   ipcMain.handle("reveal-path", async (_event: IpcMainInvokeEvent, path: string) => {
     const exists = await stat(path).then(

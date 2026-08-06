@@ -164,8 +164,9 @@ const layer: Layer.Layer<Service, never, FSUtil.Service | AppProcess.Service | C
         const remove = (file: string) => fs.remove(file).pipe(Effect.catch(() => Effect.void))
         const locked = <A, E, R>(fx: Effect.Effect<A, E, R>) => lock(state.gitdir).withPermits(1)(fx)
 
+        // Shadow-git snapshots live under Global.Path.data; they do not require the
+        // project worktree to be a git repo. Project git only helps seed object reuse.
         const enabled = Effect.fnUntraced(function* () {
-          if (state.vcs !== "git") return false
           return (yield* config.get()).snapshot !== false
         })
 

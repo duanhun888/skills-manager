@@ -1,4 +1,4 @@
-import type { FilePart, Project, UserMessage, VcsFileDiff } from "@opencode-ai/sdk/v2"
+import type { FilePart, UserMessage, VcsFileDiff } from "@opencode-ai/sdk/v2"
 import { getFilename } from "@opencode-ai/core/util/path"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { createQuery, skipToken, useMutation, useQueryClient } from "@tanstack/solid-query"
@@ -34,7 +34,6 @@ import { Tabs } from "@opencode-ai/ui/tabs"
 import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { createAutoScroll } from "@opencode-ai/ui/hooks"
 import { previewSelectedLines } from "@opencode-ai/session-ui/pierre/selection-bridge"
-import { Button } from "@opencode-ai/ui/button"
 import { showToast } from "@/utils/toast"
 import { base64Encode, checksum } from "@opencode-ai/core/util/encode"
 import { useLocation, useNavigate, useParams, useSearchParams } from "@solidjs/router"
@@ -76,6 +75,8 @@ import {
   SessionComposerRegion,
 } from "@/pages/session/composer"
 import { createOpenReviewFile, createSessionTabs, createSizing, shouldShowFileTree } from "@/pages/session/helpers"
+import { collectTurnEditedPaths, collectTurnToolDiffs } from "@/pages/session/turn-tool-diffs"
+import { uniqueSummaryDiffs } from "@/pages/session/timeline/summary-diffs"
 import { MessageTimeline } from "@/pages/session/timeline/message-timeline"
 import { createTimelineModel } from "@/pages/session/timeline/model"
 import { type DiffStyle, SessionReviewTab, type SessionReviewTabProps } from "@/pages/session/review-tab"
@@ -90,7 +91,6 @@ import { SessionFileTreePanel } from "@/pages/session/session-file-tree-panel"
 import { SessionSidePanel } from "@/pages/session/session-side-panel"
 import { sessionPanelLayout } from "@/pages/session/session-panel-layout"
 import { SessionReviewEmptyChangesV2 } from "@opencode-ai/session-ui/v2/session-review-empty-changes-v2"
-import { SessionReviewEmptyNoGitV2 } from "@opencode-ai/session-ui/v2/session-review-empty-no-git-v2"
 import { SessionReviewV2SidebarToggle } from "@opencode-ai/session-ui/v2/session-review-v2"
 import { ReviewPanelV2 } from "@/pages/session/v2/review-panel-v2"
 import { createReviewPanelV2State } from "@/pages/session/v2/review-panel-v2-state"
@@ -678,7 +678,17 @@ export default function Page() {
     return open
   }, desktopReviewOpen())
 
-  const turnDiffs = createMemo(() => list(lastUserMessage()?.summary?.diffs))
+  const turnDiffs = createMemo(() => {
+    const user = lastUserMessage()
+    const fromSummary = list(user?.summary?.diffs)
+    const fromTools = collectTurnToolDiffs({
+      userMessageID: user?.id,
+      messages: messages(),
+      parts: (messageID) => sync().data.part[messageID],
+    })
+    // Prefer live tool filediffs when snapshot summary is still empty (common without project git).
+    return uniqueSummaryDiffs([...fromSummary, ...fromTools])
+  })
   const nogit = createMemo(() => {
     const project = sync().project
     return !!project && project.vcs !== "git"
@@ -850,45 +860,6 @@ export default function Page() {
 
     autoScroll.pause()
     scrollToMessage(msgs[targetIndex], "auto")
-  }
-
-  function upsert(next: Project) {
-    const list = serverSync().data.project
-    sync().set("project", next.id)
-    const idx = list.findIndex((item) => item.id === next.id)
-    if (idx >= 0) {
-      serverSync().set(
-        "project",
-        list.map((item, i) => (i === idx ? { ...item, ...next } : item)),
-      )
-      return
-    }
-    const at = list.findIndex((item) => item.id > next.id)
-    if (at >= 0) {
-      serverSync().set("project", [...list.slice(0, at), next, ...list.slice(at)])
-      return
-    }
-    serverSync().set("project", [...list, next])
-  }
-
-  const gitMutation = useMutation(() => ({
-    mutationFn: () => sdk().client.project.initGit(),
-    onSuccess: (x) => {
-      if (!x.data) return
-      upsert(x.data)
-    },
-    onError: (err) => {
-      showToast({
-        variant: "error",
-        title: language.t("common.requestFailed"),
-        description: formatServerError(err, language.t),
-      })
-    },
-  }))
-
-  function initGit() {
-    if (gitMutation.isPending) return
-    gitMutation.mutate()
   }
 
   let inputRef!: HTMLDivElement
@@ -1233,22 +1204,6 @@ export default function Page() {
     </div>
   )
 
-  const createGit = (input: { emptyClass: string }) => (
-    <div class={input.emptyClass}>
-      <div class="flex flex-col gap-3">
-        <div class="text-14-medium text-text-strong">{language.t("session.review.noVcs.createGit.title")}</div>
-        <div class="text-14-regular text-text-base max-w-md" style={{ "line-height": "var(--line-height-normal)" }}>
-          {language.t("session.review.noVcs.createGit.description")}
-        </div>
-      </div>
-      <Button size="large" disabled={gitMutation.isPending} onClick={initGit}>
-        {gitMutation.isPending
-          ? language.t("session.review.noVcs.createGit.actionLoading")
-          : language.t("session.review.noVcs.createGit.action")}
-      </Button>
-    </div>
-  )
-
   const reviewEmptyText = createMemo(() => {
     if (reviewMode() === "git") return language.t("session.review.noUncommittedChanges")
     if (reviewMode() === "branch") return language.t("session.review.noBranchChanges")
@@ -1262,7 +1217,6 @@ export default function Page() {
     }
 
     if (reviewMode() === "turn") {
-      if (nogit()) return createGit(input)
       return empty(reviewEmptyText())
     }
 
@@ -1277,9 +1231,7 @@ export default function Page() {
     if ((reviewMode() === "git" || reviewMode() === "branch") && !reviewReady()) {
       return <div class="px-6 py-4 text-text-weak">{language.t("session.review.loadingChanges")}</div>
     }
-    if (reviewMode() === "turn" && nogit()) {
-      return <SessionReviewEmptyNoGitV2 pending={gitMutation.isPending} onInitGit={initGit} />
-    }
+    // Turn diffs use shadow-git snapshots and no longer require project git.
     return <SessionReviewEmptyChangesV2 />
   }
 
@@ -1459,6 +1411,50 @@ export default function Page() {
     view().review.setFile(path)
     setTree("pendingDiff", path)
   }
+
+  // Cursor-like: after a turn finishes with file changes, open the review preview
+  // on the first changed file (green/red line diffs) and show the changes list.
+  createEffect(
+    on(
+      () => {
+        const id = params.id ?? ""
+        const status = id ? sync().data.session_status[id]?.type : undefined
+        const user = lastUserMessage()
+        const files = turnDiffs().map((diff) => diff.file).filter((file): file is string => typeof file === "string")
+        const edited = collectTurnEditedPaths({
+          userMessageID: user?.id,
+          messages: messages(),
+          parts: (messageID) => sync().data.part[messageID],
+        })
+        return {
+          status,
+          key: files.join("\0"),
+          first: files[0],
+          editedKey: edited.join("\0"),
+          editedFirst: edited[0],
+        }
+      },
+      (curr, prev) => {
+        if (prev === undefined) return
+        if (curr.status !== "idle") return
+        const becameIdle = prev.status !== "idle"
+        const keyChanged = curr.key !== prev.key
+        const editedChanged = curr.editedKey !== prev.editedKey
+        if (!becameIdle && !keyChanged && !editedChanged) return
+        if (reviewMode() !== "turn" && untrack(() => nogit())) view().review.setMode("turn")
+        layout.fileTree.setTab("changes")
+        if (!layout.fileTree.opened()) layout.fileTree.open()
+        if (curr.first) {
+          tabs().setActive("review")
+          focusReviewDiff(curr.first)
+          return
+        }
+        // No colored diff metadata (legacy write): still open the file preview.
+        if (curr.editedFirst) openReviewFile(curr.editedFirst)
+      },
+      { defer: true },
+    ),
+  )
 
   createEffect(() => {
     const pending = tree.pendingDiff
@@ -1823,10 +1819,10 @@ export default function Page() {
                 description: language.t("prompt.toast.ocrStart.description"),
               })
             },
-            onOcrFallbackVision: () => {
+            onOcrFallbackVision: (reason) => {
               showToast({
                 title: language.t("prompt.toast.ocrFallbackVision.title"),
-                description: language.t("prompt.toast.ocrFallbackVision.description"),
+                description: `${language.t("prompt.toast.ocrFallbackVision.description")}${reason ? ` [${reason}]` : ""}`,
               })
             },
             onVisionFallbackOcr: () => {

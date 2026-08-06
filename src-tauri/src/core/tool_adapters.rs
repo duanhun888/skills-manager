@@ -368,7 +368,7 @@ pub fn default_tool_adapters() -> Vec<ToolAdapter> {
             category: ToolCategory::Coding,
             is_custom: false,
             recursive_scan: false,
-            project_relative_skills_dir: None,
+            project_relative_skills_dir: Some(".trae/skills".into()),
         },
         ToolAdapter {
             key: "cline".into(),
@@ -683,6 +683,7 @@ pub fn default_tool_adapters() -> Vec<ToolAdapter> {
             project_relative_skills_dir: None,
         },
         ToolAdapter {
+            // Trae CN (docs.trae.cn): global `~/.trae-cn/skills`, project `<repo>/.trae/skills`.
             key: "trae_cn".into(),
             display_name: "TRAE CN".into(),
             relative_skills_dir: ".trae-cn/skills".into(),
@@ -692,7 +693,7 @@ pub fn default_tool_adapters() -> Vec<ToolAdapter> {
             category: ToolCategory::Coding,
             is_custom: false,
             recursive_scan: false,
-            project_relative_skills_dir: None,
+            project_relative_skills_dir: Some(".trae/skills".into()),
         },
         ToolAdapter {
             key: "zencoder".into(),

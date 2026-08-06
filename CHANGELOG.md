@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.4.17] - 2026-08-06
+
+### Release Overview
+- Coding workbench: default file tree, open current file in external editor, and Cursor-like turn diffs without requiring project git
+
+### User-facing
+- File tree is shown by default in coding sessions; preview opens beside chat
+- Open the active preview file in VS Code / Cursor / Zed (with line jump when a range is selected)
+- After the agent edits files, change count and green/red diffs appear even when the folder is not a git repo
+- OCR usefulness treats short CJK logos more fairly; Trae CN project skills use `.trae/skills`
+
+### Developer & Governance
+- Shadow-git snapshots no longer require `project.vcs === "git"`; summarize falls back to tool `filediff` / apply_patch files
+- Client aggregates live tool diffs for the review panel; desktop `openPath` supports `path:line` via `-g`
+- One-shot layout/settings migration opens file tree + review panel for existing installs
+
 ## [1.4.16] - 2026-08-05
 
 ### Release Overview

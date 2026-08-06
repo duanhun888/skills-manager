@@ -34,8 +34,8 @@ type PlatformBase = {
   /** Open a URL in the default browser */
   openLink(url: string): void
 
-  /** Open a local path in a local app (desktop only) */
-  openPath?(path: string, app?: string): Promise<void>
+  /** Open a local path in a local app (desktop only). Optional 1-based line for editors that support -g. */
+  openPath?(path: string, app?: string, line?: number): Promise<void>
 
   /** Reveal a local path in the system file manager; false when the path does not exist (desktop only) */
   revealPath?(path: string): Promise<boolean>

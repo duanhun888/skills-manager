@@ -121,6 +121,18 @@ const showRequestError = (language: ReturnType<typeof useLanguage>, err: unknown
   })
 }
 
+/** Join project root + relative tab path into a native absolute path for desktop open. */
+export function resolveOpenFilePath(directory: string, file: string) {
+  const trimmed = file.trim()
+  if (!trimmed) return ""
+  if (/^[A-Za-z]:[\\/]/.test(trimmed) || trimmed.startsWith("/") || trimmed.startsWith("\\\\")) return trimmed
+  const root = directory.replace(/[/\\]+$/, "")
+  if (!root) return trimmed
+  const sep = /\\/.test(directory) ? "\\" : "/"
+  const rel = trimmed.replace(/\\/g, "/").replace(/^\.\//, "")
+  return `${root}${sep}${rel.split("/").join(sep)}`
+}
+
 export function useOpenInApp(input: { directory: () => string }) {
   const platform = usePlatform()
   const server = useServer()
@@ -166,7 +178,7 @@ export function useOpenInApp(input: { directory: () => string }) {
   const [prefs, setPrefs] = persisted(Persist.global("open.app"), createStore({ app: "finder" as OpenApp | "finder" }))
   const [menu, setMenu] = createStore({ open: false })
   const [openRequest, setOpenRequest] = createStore({
-    app: undefined as OpenApp | undefined,
+    app: undefined as OpenApp | "finder" | undefined,
   })
 
   const canOpen = createMemo(() => platform.platform === "desktop" && !!platform.openPath && server.isLocal())
@@ -199,17 +211,43 @@ export function useOpenInApp(input: { directory: () => string }) {
       })
   }
 
-  const copyPath = () => {
-    const directory = input.directory()
-    if (!directory) return
+  const openFile = (path: string, opts?: { line?: number; app?: OpenApp | "finder" }) => {
+    if (opening() || !canOpen() || !platform.openPath) return
+    const target = resolveOpenFilePath(input.directory(), path)
+    if (!target) return
+
+    const app = opts?.app ?? current().id
+    const item = options().find((o) => o.id === app)
+    const openWith = item && "openWith" in item ? item.openWith : undefined
+    const line = opts?.line !== undefined && opts.line > 0 ? Math.floor(opts.line) : undefined
+
+    setOpenRequest("app", app)
+    const run =
+      app === "finder"
+        ? platform.revealPath
+          ? platform.revealPath(target).then(() => undefined)
+          : platform.openPath(target)
+        : platform.openPath(target, openWith, line)
+
+    Promise.resolve(run)
+      .catch((err: unknown) => showRequestError(language, err))
+      .finally(() => {
+        setOpenRequest("app", undefined)
+      })
+  }
+
+  const copyPath = (path?: string) => {
+    const raw = (path ?? input.directory()).trim()
+    const value = path ? resolveOpenFilePath(input.directory(), raw) || raw : raw
+    if (!value) return
     navigator.clipboard
-      .writeText(directory)
+      .writeText(value)
       .then(() => {
         showToast({
           variant: "success",
           icon: "circle-check",
           title: language.t("session.share.copy.copied"),
-          description: directory,
+          description: value,
         })
       })
       .catch((err: unknown) => showRequestError(language, err))
@@ -223,6 +261,7 @@ export function useOpenInApp(input: { directory: () => string }) {
     menu,
     setMenu,
     openDir,
+    openFile,
     selectApp,
     copyPath,
   }

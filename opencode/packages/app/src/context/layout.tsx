@@ -32,6 +32,12 @@ export type FileTreePosition = "left" | "right"
 const DEFAULT_FILE_TREE_POSITION = "right" as FileTreePosition
 export type ChatPosition = "left" | "right"
 const DEFAULT_CHAT_POSITION = "left" as ChatPosition
+const DEFAULT_SESSION_WIDTH = 600
+const DEFAULT_TERMINAL_HEIGHT = 280
+/** Preview / file-tabs column; default open so coding sessions show code beside chat. */
+const DEFAULT_REVIEW_PANEL_OPENED = true
+const DEFAULT_FILE_TREE_OPENED = true
+export type AvatarColorKey = (typeof AVATAR_COLOR_KEYS)[number]
 
 function createFileTreeState(partial?: {
   opened?: boolean
@@ -45,16 +51,12 @@ function createFileTreeState(partial?: {
   position: FileTreePosition
 } {
   return {
-    opened: partial?.opened ?? true,
+    opened: partial?.opened ?? DEFAULT_FILE_TREE_OPENED,
     width: partial?.width ?? DEFAULT_FILE_TREE_WIDTH,
     tab: partial?.tab ?? "changes",
     position: partial?.position ?? DEFAULT_FILE_TREE_POSITION,
   }
 }
-const DEFAULT_SESSION_WIDTH = 600
-const DEFAULT_TERMINAL_HEIGHT = 280
-const DEFAULT_REVIEW_PANEL_OPENED = false
-export type AvatarColorKey = (typeof AVATAR_COLOR_KEYS)[number]
 
 export function getAvatarColors(key?: string) {
   if (key && AVATAR_COLOR_KEYS.includes(key as AvatarColorKey)) {
@@ -218,19 +220,30 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
 
       const review = value.review
       const fileTree = value.fileTree
+      // One-shot: previous defaults kept tree + preview closed; open them for coding UX.
+      const applyCodingPreviewDefaults = value.codingPreviewUx !== true
       const migratedFileTree = (() => {
-        if (!isRecord(fileTree)) return fileTree
+        if (!isRecord(fileTree)) {
+          if (!applyCodingPreviewDefaults) return fileTree
+          return createFileTreeState({ opened: DEFAULT_FILE_TREE_OPENED })
+        }
 
         const position: FileTreePosition =
           fileTree.position === "left" || fileTree.position === "right"
             ? fileTree.position
             : DEFAULT_FILE_TREE_POSITION
         const needsPosition = fileTree.position !== position
+        const opened = applyCodingPreviewDefaults
+          ? DEFAULT_FILE_TREE_OPENED
+          : typeof fileTree.opened === "boolean"
+            ? fileTree.opened
+            : DEFAULT_FILE_TREE_OPENED
 
         if (fileTree.tab === "changes" || fileTree.tab === "all") {
-          if (!needsPosition) return fileTree
+          if (!needsPosition && fileTree.opened === opened && !applyCodingPreviewDefaults) return fileTree
           return {
             ...fileTree,
+            opened,
             position,
           }
         }
@@ -238,7 +251,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         const width = typeof fileTree.width === "number" ? fileTree.width : DEFAULT_FILE_TREE_WIDTH
         return {
           ...fileTree,
-          opened: true,
+          opened,
           width: width === 260 ? DEFAULT_FILE_TREE_WIDTH : width,
           tab: "changes",
           position,
@@ -246,7 +259,16 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
       })()
 
       const migratedReview = (() => {
-        if (!isRecord(review)) return review
+        if (!isRecord(review)) {
+          if (!applyCodingPreviewDefaults) return review
+          return { diffStyle: "split", panelOpened: DEFAULT_REVIEW_PANEL_OPENED }
+        }
+        if (applyCodingPreviewDefaults) {
+          return {
+            ...review,
+            panelOpened: DEFAULT_REVIEW_PANEL_OPENED,
+          }
+        }
         if (typeof review.panelOpened === "boolean") return review
 
         const opened =
@@ -298,6 +320,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
       })()
 
       if (
+        !applyCodingPreviewDefaults &&
         migratedSidebar === sidebar &&
         migratedReview === review &&
         migratedFileTree === fileTree &&
@@ -310,6 +333,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
 
       return {
         ...value,
+        codingPreviewUx: true,
         sidebar: migratedSidebar,
         review: migratedReview,
         fileTree: migratedFileTree,
@@ -337,8 +361,9 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
           diffStyle: "split" as ReviewDiffStyle,
           panelOpened: DEFAULT_REVIEW_PANEL_OPENED,
         },
+        codingPreviewUx: true,
         fileTree: {
-          opened: false,
+          opened: DEFAULT_FILE_TREE_OPENED,
           width: DEFAULT_FILE_TREE_WIDTH,
           tab: "changes" as "changes" | "all",
           position: DEFAULT_FILE_TREE_POSITION as FileTreePosition,
@@ -745,7 +770,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         },
       },
       fileTree: {
-        opened: createMemo(() => store.fileTree?.opened ?? true),
+        opened: createMemo(() => store.fileTree?.opened ?? DEFAULT_FILE_TREE_OPENED),
         width: createMemo(() => store.fileTree?.width ?? DEFAULT_FILE_TREE_WIDTH),
         tab: createMemo(() => store.fileTree?.tab ?? "changes"),
         position: createMemo(

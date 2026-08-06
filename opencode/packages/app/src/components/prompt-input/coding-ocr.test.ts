@@ -19,6 +19,15 @@ describe("coding-ocr", () => {
     expect(isOcrUseful({ texts: ["hi"], scores: [0.9] }).ok).toBe(false)
   })
 
+  test("isOcrUseful accepts short CJK logo text", () => {
+    const result = isOcrUseful({
+      texts: ["跨境AI专家"],
+      scores: [0.98],
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.text).toBe("跨境AI专家")
+  })
+
   test("isOcrUseful rejects low confidence", () => {
     const result = isOcrUseful({
       texts: ["something long enough", "another line here"],

@@ -145,17 +145,25 @@ export function useSkillsModelPolicy() {
   const baseUrl = createMemo(() => server.current?.http.url)
   const httpAuth = createMemo(() => server.current?.http)
 
-  const refresh = async () => {
-    if (document.visibilityState === "hidden") return
+  const refresh = async (opts?: { force?: boolean }) => {
+    if (!opts?.force && document.visibilityState === "hidden") {
+      if (fingerprint(current()) !== lastFingerprint) setCurrent(lastGood)
+      return
+    }
     const next = await fetchPolicy(baseUrl(), httpAuth())
     const fp = fingerprint(next)
-    if (fp === lastFingerprint) return
-    lastFingerprint = fp
-    lastGood = next
-    setCurrent(next)
+    // Multiple hook instances race: the first success updates lastFingerprint;
+    // later instances must still setCurrent or they stay stuck on OPEN.
+    if (fp !== lastFingerprint) {
+      lastFingerprint = fp
+      lastGood = next
+    }
+    if (fingerprint(current()) !== lastFingerprint) setCurrent(lastGood)
   }
 
   onMount(() => {
+    // Adopt any policy another instance already loaded before this mount.
+    if (fingerprint(current()) !== lastFingerprint) setCurrent(lastGood)
     void refresh()
     const timer = window.setInterval(() => void refresh(), POLL_MS)
     const onVisible = () => {
@@ -174,5 +182,5 @@ export function useSkillsModelPolicy() {
     return p.requirements_only_models.some((entry) => entryMatches(entry, providerID, modelID))
   }
 
-  return { policy: current, isCodingBlocked }
+  return { policy: current, isCodingBlocked, refresh }
 }

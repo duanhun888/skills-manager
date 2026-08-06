@@ -3,7 +3,7 @@ import * as path from "path"
 import { Effect } from "effect"
 import * as Tool from "./tool"
 import { LSP } from "@/lsp/lsp"
-import { createTwoFilesPatch } from "diff"
+import { createTwoFilesPatch, diffLines } from "diff"
 import DESCRIPTION from "./write.txt"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { FileSystem } from "@opencode-ai/core/filesystem"
@@ -11,6 +11,7 @@ import { Watcher } from "@opencode-ai/core/filesystem/watcher"
 import { Format } from "../format"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { InstanceState } from "@/effect/instance-state"
+import { Snapshot } from "@/snapshot"
 import { trimDiff } from "./edit"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import * as Bom from "@/util/bom"
@@ -71,6 +72,21 @@ export const WriteTool = Tool.define(
             event: exists ? "change" : "add",
           })
 
+          let additions = 0
+          let deletions = 0
+          for (const change of diffLines(contentOld, contentNew)) {
+            if (change.added) additions += change.count || 0
+            if (change.removed) deletions += change.count || 0
+          }
+          const relative = path.relative(instance.worktree, filepath)
+          const filediff: Snapshot.FileDiff = {
+            file: relative,
+            patch: diff,
+            additions,
+            deletions,
+            status: exists ? "modified" : "added",
+          }
+
           let output = "Wrote file successfully."
           yield* lsp.touchFile(filepath, "document")
           const diagnostics = yield* lsp.diagnostics()
@@ -90,11 +106,13 @@ export const WriteTool = Tool.define(
           }
 
           return {
-            title: path.relative(instance.worktree, filepath),
+            title: relative,
             metadata: {
               diagnostics,
               filepath,
               exists: exists,
+              diff,
+              filediff,
             },
             output,
           }
