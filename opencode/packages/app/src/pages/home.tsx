@@ -66,8 +66,10 @@ import { Persist, persisted } from "@/utils/persist"
 import { useMarked } from "@opencode-ai/ui/context/marked"
 import { preloadMarkdown } from "@opencode-ai/session-ui/markdown-cache"
 import { archiveHomeSession } from "./home-session-archive"
+import { deleteHomeSession } from "./home-session-delete"
 import { shouldOpenSessionInBackground } from "./home-session-open"
 import { showToast } from "@/utils/toast"
+import { DialogFooter, DialogHeader, DialogTitleGroup, DialogV2 } from "@opencode-ai/ui/v2/dialog-v2"
 import { fileManagerApp } from "@/utils/file-manager"
 import {
   loadHomeSessionIndex,
@@ -96,7 +98,6 @@ function containHomeWheel(event: WheelEvent, viewport: HTMLElement) {
 
   event.preventDefault()
 }
-const SHOW_HOME_SESSION_ARCHIVE = false
 const HOME_ROW_LAYOUT =
   "flex min-w-0 w-full shrink-0 cursor-default items-center rounded-[6px] bg-transparent text-left transition-[background-color,color,box-shadow] duration-[120ms] ease-in-out focus-visible:outline-none"
 const HOME_ROW_BASE = `${HOME_ROW_LAYOUT} border-0`
@@ -598,23 +599,91 @@ export function NewHome() {
     const ctx = focusedServerCtx()
     if (!conn || !ctx) return
     const [, setStore] = ctx.sync.child(session.directory)
+    const archivedAt = Date.now()
     await archiveHomeSession({
       server: ServerConnection.key(conn),
       session,
-      update: (value) => ctx.sdk.client.session.update(value),
-      remove: () =>
+      update: (value) => ctx.sdk.client.session.update({ ...value, directory: session.directory }),
+      remove: () => {
+        homeSessions().apply({
+          type: "session.updated",
+          properties: {
+            sessionID: session.id,
+            info: {
+              ...session,
+              time: { ...session.time, archived: archivedAt },
+            },
+          },
+        })
         setStore(
           produce((draft) => {
             const match = Binary.search(draft.session, session.id, (s) => s.id)
             if (match.found) draft.session.splice(match.index, 1)
           }),
-        ),
+        )
+      },
       onError: (error) =>
         showToast({
           title: language.t("common.requestFailed"),
           description: errorMessage(error, language.t("common.requestFailed")),
         }),
     })
+  }
+
+  async function deleteSession(session: Session) {
+    const conn = focusedServer()
+    const ctx = focusedServerCtx()
+    if (!conn || !ctx) return
+    const [, setStore] = ctx.sync.child(session.directory)
+    const client = ctx.sdk.createClient({ directory: session.directory, throwOnError: true })
+    await deleteHomeSession({
+      server: ServerConnection.key(conn),
+      session,
+      removeRemote: () => client.session.delete({ sessionID: session.id, directory: session.directory }),
+      removeLocal: () => {
+        homeSessions().apply({
+          type: "session.deleted",
+          properties: { sessionID: session.id, info: session },
+        })
+        setStore(
+          produce((draft) => {
+            draft.session = draft.session.filter((item) => item.id !== session.id && item.parentID !== session.id)
+          }),
+        )
+      },
+      onError: (error) =>
+        showToast({
+          title: language.t("session.delete.failed.title"),
+          description: errorMessage(error, language.t("session.delete.failed.title")),
+        }),
+    })
+  }
+
+  function confirmDeleteSession(session: Session) {
+    const name = sessionTitle(session.title) || session.id
+    dialog.show(() => (
+      <DialogV2 fit>
+        <DialogHeader hideClose>
+          <DialogTitleGroup
+            title={language.t("session.delete.title")}
+            description={language.t("session.delete.confirm", { name })}
+          />
+        </DialogHeader>
+        <DialogFooter>
+          <ButtonV2 variant="ghost" onClick={() => dialog.close()}>
+            {language.t("common.cancel")}
+          </ButtonV2>
+          <ButtonV2
+            variant="danger"
+            onClick={() => {
+              void deleteSession(session).finally(() => dialog.close())
+            }}
+          >
+            {language.t("session.delete.button")}
+          </ButtonV2>
+        </DialogFooter>
+      </DialogV2>
+    ))
   }
 
   function chooseProject(conn: ServerConnection.Any) {
@@ -766,6 +835,7 @@ export function NewHome() {
                                   server={selection().server}
                                   openSession={openSession}
                                   archiveSession={archiveSession}
+                                  deleteSession={confirmDeleteSession}
                                 />
                               )}
                             </For>
@@ -1582,6 +1652,7 @@ function HomeSessionRow(props: {
   server: ServerConnection.Key
   openSession: (session: Session, options?: OpenSessionOptions) => void
   archiveSession: (session: Session) => Promise<void>
+  deleteSession: (session: Session) => void
 }) {
   const language = useLanguage()
   const title = createMemo(() => sessionTitle(props.record.session.title) || props.record.session.id)
@@ -1595,7 +1666,7 @@ function HomeSessionRow(props: {
       <button
         type="button"
         data-component="home-session-row"
-        class={`${HOME_ROW} h-10 min-w-0 flex-1 gap-2 py-3 pl-3 pr-10`}
+        class={`${HOME_ROW} h-10 min-w-0 flex-1 gap-2 py-3 pl-3 pr-16`}
         onMouseDown={(event) => {
           if (event.button === 1) event.preventDefault()
         }}
@@ -1623,24 +1694,54 @@ function HomeSessionRow(props: {
           </span>
         </Show>
       </button>
-      <Show when={SHOW_HOME_SESSION_ARCHIVE}>
-        <div class="hover-reveal absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-1 group-hover/session:opacity-100 focus-within:opacity-100">
-          <TooltipV2 class="flex shrink-0 items-center" placement="bottom" value={language.t("common.archive")}>
-            <IconButtonV2
-              data-action="home-session-archive"
-              variant="ghost-muted"
-              size="large"
-              icon={<IconV2 name="archive" />}
-              aria-label={language.t("common.archive")}
-              onClick={(event) => {
-                event.preventDefault()
-                event.stopPropagation()
-                void props.archiveSession(props.record.session)
-              }}
-            />
-          </TooltipV2>
-        </div>
-      </Show>
+      <div class="hover-reveal absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-0.5 opacity-0 group-hover/session:opacity-100 focus-within:opacity-100">
+        <TooltipV2 class="flex shrink-0 items-center" placement="bottom" value={language.t("common.archive")}>
+          <IconButtonV2
+            data-action="home-session-archive"
+            variant="ghost-muted"
+            size="large"
+            icon={<IconV2 name="archive" />}
+            aria-label={language.t("common.archive")}
+            onClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              void props.archiveSession(props.record.session)
+            }}
+          />
+        </TooltipV2>
+        <MenuV2 gutter={4} placement="bottom-end">
+          <MenuV2.Trigger
+            as={IconButtonV2}
+            data-action="home-session-more"
+            variant="ghost-muted"
+            size="large"
+            icon={<IconV2 name="outline-dots" />}
+            aria-label={language.t("common.moreOptions")}
+            onClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+            }}
+          />
+          <MenuV2.Portal>
+            <MenuV2.Content>
+              <MenuV2.Item
+                onSelect={() => {
+                  void props.archiveSession(props.record.session)
+                }}
+              >
+                {language.t("common.archive")}
+              </MenuV2.Item>
+              <MenuV2.Item
+                onSelect={() => {
+                  props.deleteSession(props.record.session)
+                }}
+              >
+                {language.t("common.delete")}
+              </MenuV2.Item>
+            </MenuV2.Content>
+          </MenuV2.Portal>
+        </MenuV2>
+      </div>
     </div>
   )
 }

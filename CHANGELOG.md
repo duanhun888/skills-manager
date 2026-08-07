@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.4.19] - 2026-08-07
+
+### Release Overview
+- Home session history: archive/delete from the list, and fix stale “Session not found” deletes
+
+### User-facing
+- Hover a session on Home to archive or open ⋯ → Delete (with confirm)
+- Deleting a ghost/stale session clears it from the list instead of failing with “Session not found”
+
+### Developer & Governance
+- Home delete uses the session directory client and updates the home session index
+- Missing-session API errors are treated as successful local cleanup
+
 ## [1.4.18] - 2026-08-06
 
 ### Release Overview
