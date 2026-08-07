@@ -733,6 +733,8 @@ export const dict = {
   "settings.general.row.followup.option.steer": "Diriger",
   "settings.general.row.showFileTree.title": "Arborescence des fichiers",
   "settings.general.row.showFileTree.description": "Afficher le panneau d'arborescence des fichiers dans les sessions",
+  "settings.general.row.showReviewPanel.title": "Change preview",
+  "settings.general.row.showReviewPanel.description": "Show the middle change preview panel in coding sessions by default",
   "settings.general.row.showNavigation.title": "Commandes de navigation",
   "settings.general.row.showNavigation.description":
     "Afficher les boutons précédent et suivant dans la barre de titre de l'application desktop",

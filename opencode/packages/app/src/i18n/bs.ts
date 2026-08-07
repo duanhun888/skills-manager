@@ -790,6 +790,8 @@ export const dict = {
   "settings.general.row.followup.option.steer": "Usmjeri",
   "settings.general.row.showFileTree.title": "Stablo datoteka",
   "settings.general.row.showFileTree.description": "Prikaži stablo datoteka u sesijama",
+  "settings.general.row.showReviewPanel.title": "Change preview",
+  "settings.general.row.showReviewPanel.description": "Show the middle change preview panel in coding sessions by default",
   "settings.general.row.showNavigation.title": "Kontrole navigacije",
   "settings.general.row.showNavigation.description":
     "Prikaži dugmad za nazad i naprijed u naslovnoj traci desktop aplikacije",

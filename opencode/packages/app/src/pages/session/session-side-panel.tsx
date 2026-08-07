@@ -47,6 +47,7 @@ import {
   createOpenSessionFileTab,
   createSessionTabs,
   getTabReorderIndex,
+  shouldShowReviewPanel,
   type Sizing,
 } from "@/pages/session/helpers"
 import { setSessionHandoff } from "@/pages/session/handoff"
@@ -97,7 +98,14 @@ export function SessionSidePanel(props: {
 
   const isDesktop = createMediaQuery("(min-width: 768px)")
 
-  const reviewOpen = createMemo(() => isDesktop() && view().reviewPanel.opened())
+  const reviewOpen = createMemo(
+    () =>
+      isDesktop() &&
+      shouldShowReviewPanel({
+        visible: settings.visibility.reviewPanel(),
+        opened: view().reviewPanel.opened(),
+      }),
+  )
   const open = createMemo(() => reviewOpen())
   const reviewTab = createMemo(() => isDesktop())
   const panelWidth = createMemo(() => {
@@ -136,6 +144,7 @@ export function SessionSidePanel(props: {
   }
 
   const openReviewPanel = () => {
+    if (!settings.general.showReviewPanel()) settings.general.setShowReviewPanel(true)
     if (!view().reviewPanel.opened()) view().reviewPanel.open()
   }
 

@@ -74,7 +74,7 @@ import {
   createSessionComposerRegionController,
   SessionComposerRegion,
 } from "@/pages/session/composer"
-import { createOpenReviewFile, createSessionTabs, createSizing, shouldShowFileTree } from "@/pages/session/helpers"
+import { createOpenReviewFile, createSessionTabs, createSizing, shouldShowFileTree, shouldShowReviewPanel } from "@/pages/session/helpers"
 import { collectTurnEditedPaths, collectTurnToolDiffs } from "@/pages/session/turn-tool-diffs"
 import { uniqueSummaryDiffs } from "@/pages/session/timeline/summary-diffs"
 import { MessageTimeline } from "@/pages/session/timeline/message-timeline"
@@ -454,7 +454,14 @@ export default function Page() {
 
   const isDesktop = createMediaQuery("(min-width: 768px)")
   const size = createSizing()
-  const desktopReviewOpen = createMemo(() => isDesktop() && view().reviewPanel.opened())
+  const desktopReviewOpen = createMemo(
+    () =>
+      isDesktop() &&
+      shouldShowReviewPanel({
+        visible: settings.visibility.reviewPanel(),
+        opened: view().reviewPanel.opened(),
+      }),
+  )
   const desktopV2ReviewOpen = createMemo(() => newSessionDesign() && desktopReviewOpen() && !!params.id)
   const terminalOpen = createMemo(() => view().terminal.opened())
   const desktopTerminalOpen = createMemo(() => isDesktop() && terminalOpen())
@@ -556,6 +563,7 @@ export default function Page() {
   }
 
   const openReviewPanel = () => {
+    if (!settings.general.showReviewPanel()) settings.general.setShowReviewPanel(true)
     if (!view().reviewPanel.opened()) view().reviewPanel.open()
   }
 
@@ -1412,8 +1420,9 @@ export default function Page() {
     setTree("pendingDiff", path)
   }
 
-  // Cursor-like: after a turn finishes with file changes, open the review preview
-  // on the first changed file (green/red line diffs) and show the changes list.
+  // Cursor-like: after a turn finishes with file changes, focus the review preview
+  // on the first changed file when the panel is already open. Do not force-open
+  // if the user closed the middle preview (ops layout: directory + chat).
   createEffect(
     on(
       () => {
@@ -1444,6 +1453,7 @@ export default function Page() {
         if (reviewMode() !== "turn" && untrack(() => nogit())) view().review.setMode("turn")
         layout.fileTree.setTab("changes")
         if (!layout.fileTree.opened()) layout.fileTree.open()
+        if (!view().reviewPanel.opened()) return
         if (curr.first) {
           tabs().setActive("review")
           focusReviewDiff(curr.first)

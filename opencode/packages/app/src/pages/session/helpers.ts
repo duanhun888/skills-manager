@@ -28,6 +28,10 @@ export function shouldShowFileTree(input: { visible: boolean; opened: boolean })
   return input.opened && input.visible
 }
 
+export function shouldShowReviewPanel(input: { visible: boolean; opened: boolean }) {
+  return input.opened && input.visible
+}
+
 export const createSessionTabs = (input: TabsInput) => {
   const review = input.review ?? (() => false)
   const hasReview = input.hasReview ?? (() => false)

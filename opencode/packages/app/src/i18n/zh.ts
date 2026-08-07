@@ -70,7 +70,7 @@ export const dict = {
 
   "command.fileTree.toggle": "切换文件树",
 
-  "command.review.toggle": "切换审查",
+  "command.review.toggle": "切换变更预览",
 
   "command.terminal.new": "新建终端",
   "command.terminal.new.description": "创建新的终端标签页",
@@ -803,6 +803,8 @@ export const dict = {
   "settings.general.row.followup.option.steer": "引导",
   "settings.general.row.showFileTree.title": "文件树",
   "settings.general.row.showFileTree.description": "默认在会话中显示文件树，便于浏览与预览文件",
+  "settings.general.row.showReviewPanel.title": "变更预览",
+  "settings.general.row.showReviewPanel.description": "默认在编码会话中显示中间变更预览面板；关闭后仅保留文件树与对话",
   "settings.general.row.fileTreePosition.title": "文件树位置",
   "settings.general.row.fileTreePosition.description": "将会话文件树放在聊天左侧或右侧",
   "settings.general.row.fileTreePosition.option.left": "左侧",

@@ -791,6 +791,8 @@ export const dict = {
   "settings.general.row.followup.option.steer": "Направлять",
   "settings.general.row.showFileTree.title": "Дерево файлов",
   "settings.general.row.showFileTree.description": "Показывать панель дерева файлов в сессиях",
+  "settings.general.row.showReviewPanel.title": "Change preview",
+  "settings.general.row.showReviewPanel.description": "Show the middle change preview panel in coding sessions by default",
   "settings.general.row.showNavigation.title": "Элементы навигации",
   "settings.general.row.showNavigation.description":
     "Показывать кнопки «Назад» и «Вперёд» в строке заголовка приложения",

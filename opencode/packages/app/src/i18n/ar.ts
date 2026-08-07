@@ -716,6 +716,8 @@ export const dict = {
   "settings.general.row.followup.option.steer": "توجيه",
   "settings.general.row.showFileTree.title": "شجرة الملفات",
   "settings.general.row.showFileTree.description": "إظهار لوحة شجرة الملفات في الجلسات",
+  "settings.general.row.showReviewPanel.title": "Change preview",
+  "settings.general.row.showReviewPanel.description": "Show the middle change preview panel in coding sessions by default",
   "settings.general.row.showNavigation.title": "عناصر التحكم في التنقل",
   "settings.general.row.showNavigation.description": "إظهار زري الرجوع والتقدم في شريط عنوان سطح المكتب",
   "settings.general.row.showSearch.title": "لوحة الأوامر",

@@ -737,6 +737,8 @@ export const dict = {
   "settings.general.row.followup.option.steer": "Steuern",
   "settings.general.row.showFileTree.title": "Dateibaum",
   "settings.general.row.showFileTree.description": "Dateibaum in Sitzungen anzeigen",
+  "settings.general.row.showReviewPanel.title": "Change preview",
+  "settings.general.row.showReviewPanel.description": "Show the middle change preview panel in coding sessions by default",
   "settings.general.row.showNavigation.title": "Navigationssteuerung",
   "settings.general.row.showNavigation.description":
     "Schaltflächen zum Vor- und Zurücknavigieren in der Desktop-Titelleiste anzeigen",

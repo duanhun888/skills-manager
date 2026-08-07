@@ -797,6 +797,8 @@ export const dict = {
   "settings.general.row.followup.option.steer": "Yönlendir",
   "settings.general.row.showFileTree.title": "Dosya ağacı",
   "settings.general.row.showFileTree.description": "Oturumlarda dosya ağacı panelini göster",
+  "settings.general.row.showReviewPanel.title": "Change preview",
+  "settings.general.row.showReviewPanel.description": "Show the middle change preview panel in coding sessions by default",
   "settings.general.row.showNavigation.title": "Gezinme denetimleri",
   "settings.general.row.showNavigation.description": "Masaüstü başlık çubuğunda geri ve ileri düğmelerini göster",
   "settings.general.row.showSearch.title": "Komut paleti",

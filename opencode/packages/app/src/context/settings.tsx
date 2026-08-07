@@ -25,6 +25,7 @@ export interface Settings {
     releaseNotes: boolean
     followup: "queue" | "steer"
     showFileTree: boolean
+    showReviewPanel: boolean
     showNavigation: boolean
     showSearch: boolean
     showStatus: boolean
@@ -178,6 +179,7 @@ const defaultSettings: Settings = {
     releaseNotes: true,
     followup: "steer",
     showFileTree: true,
+    showReviewPanel: true,
     showNavigation: false,
     showSearch: false,
     showStatus: false,
@@ -259,6 +261,10 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
       previous: undefined as string | undefined,
     })
     const showFileTree = withFallback(() => store.general?.showFileTree, defaultSettings.general.showFileTree)
+    const showReviewPanel = withFallback(
+      () => store.general?.showReviewPanel,
+      defaultSettings.general.showReviewPanel,
+    )
     const showSearch = withFallback(() => store.general?.showSearch, defaultSettings.general.showSearch)
     const showStatus = withFallback(() => store.general?.showStatus, defaultSettings.general.showStatus)
     const showCustomAgents = withFallback(
@@ -383,6 +389,10 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         setShowFileTree(value: boolean) {
           setStore("general", "showFileTree", value)
         },
+        showReviewPanel,
+        setShowReviewPanel(value: boolean) {
+          setStore("general", "showReviewPanel", value)
+        },
         showNavigation: withFallback(() => store.general?.showNavigation, defaultSettings.general.showNavigation),
         setShowNavigation(value: boolean) {
           setStore("general", "showNavigation", value)
@@ -456,6 +466,7 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
       },
       visibility: {
         fileTree: visible(showFileTree),
+        reviewPanel: visible(showReviewPanel),
         search: visible(showSearch),
         status: visible(showStatus),
         customAgents: visible(showCustomAgents),

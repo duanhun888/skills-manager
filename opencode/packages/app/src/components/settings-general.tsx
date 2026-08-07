@@ -412,6 +412,21 @@ export const SettingsGeneral: Component = () => {
         </SettingsRow>
 
         <SettingsRow
+          title={language.t("settings.general.row.showReviewPanel.title")}
+          description={language.t("settings.general.row.showReviewPanel.description")}
+        >
+          <div data-action="settings-show-review-panel">
+            <Switch
+              checked={settings.general.showReviewPanel()}
+              onChange={(checked) => {
+                settings.general.setShowReviewPanel(checked)
+                if (!checked) layout.view("").reviewPanel.close()
+              }}
+            />
+          </div>
+        </SettingsRow>
+
+        <SettingsRow
           title={language.t("settings.general.row.fileTreePosition.title")}
           description={language.t("settings.general.row.fileTreePosition.description")}
         >

@@ -783,6 +783,8 @@ export const dict = {
   "settings.general.row.followup.option.steer": "นำทาง",
   "settings.general.row.showFileTree.title": "ต้นไม้ไฟล์",
   "settings.general.row.showFileTree.description": "แสดงแผงต้นไม้ไฟล์ในเซสชัน",
+  "settings.general.row.showReviewPanel.title": "Change preview",
+  "settings.general.row.showReviewPanel.description": "Show the middle change preview panel in coding sessions by default",
   "settings.general.row.showNavigation.title": "ตัวควบคุมการนำทาง",
   "settings.general.row.showNavigation.description": "แสดงปุ่มย้อนกลับและไปข้างหน้าในแถบชื่อเรื่องเดสก์ท็อป",
   "settings.general.row.showSearch.title": "ชุดคำสั่ง",

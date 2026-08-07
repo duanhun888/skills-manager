@@ -726,6 +726,8 @@ export const dict = {
   "settings.general.row.followup.option.steer": "Orientar",
   "settings.general.row.showFileTree.title": "Árvore de arquivos",
   "settings.general.row.showFileTree.description": "Mostrar o painel da árvore de arquivos nas sessões",
+  "settings.general.row.showReviewPanel.title": "Change preview",
+  "settings.general.row.showReviewPanel.description": "Show the middle change preview panel in coding sessions by default",
   "settings.general.row.showNavigation.title": "Controles de navegação",
   "settings.general.row.showNavigation.description":
     "Mostrar os botões de voltar e avançar na barra de título do desktop",

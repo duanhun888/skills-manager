@@ -789,6 +789,8 @@ export const dict = {
   "settings.general.row.followup.option.steer": "引導",
   "settings.general.row.showFileTree.title": "檔案樹",
   "settings.general.row.showFileTree.description": "在工作階段中顯示檔案樹面板",
+  "settings.general.row.showReviewPanel.title": "變更預覽",
+  "settings.general.row.showReviewPanel.description": "預設在編碼工作階段中顯示中間變更預覽面板",
   "settings.general.row.showNavigation.title": "導覽控制項",
   "settings.general.row.showNavigation.description": "在桌面標題列中顯示上一頁和下一頁按鈕",
   "settings.general.row.showSearch.title": "命令面板",

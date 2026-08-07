@@ -726,6 +726,8 @@ export const dict = {
   "settings.general.row.followup.option.steer": "Sterowanie",
   "settings.general.row.showFileTree.title": "Drzewo plików",
   "settings.general.row.showFileTree.description": "Pokaż panel drzewa plików w sesjach",
+  "settings.general.row.showReviewPanel.title": "Change preview",
+  "settings.general.row.showReviewPanel.description": "Show the middle change preview panel in coding sessions by default",
   "settings.general.row.showNavigation.title": "Elementy nawigacji",
   "settings.general.row.showNavigation.description":
     "Pokaż przyciski Wstecz i Dalej na pasku tytułu aplikacji komputerowej",

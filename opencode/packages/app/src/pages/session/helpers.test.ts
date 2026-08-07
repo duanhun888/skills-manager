@@ -9,12 +9,20 @@ import {
   focusTerminalById,
   getTabReorderIndex,
   shouldShowFileTree,
+  shouldShowReviewPanel,
 } from "./helpers"
 
 describe("shouldShowFileTree", () => {
   test("does not reserve space for a disabled file tree", () => {
     expect(shouldShowFileTree({ visible: false, opened: true })).toBe(false)
     expect(shouldShowFileTree({ visible: true, opened: true })).toBe(true)
+  })
+})
+
+describe("shouldShowReviewPanel", () => {
+  test("does not reserve space for a disabled review panel", () => {
+    expect(shouldShowReviewPanel({ visible: false, opened: true })).toBe(false)
+    expect(shouldShowReviewPanel({ visible: true, opened: true })).toBe(true)
   })
 })
 

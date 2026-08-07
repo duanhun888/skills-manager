@@ -107,6 +107,7 @@ export function SessionFileTreePanel(props: {
   }
 
   const openReviewPanel = () => {
+    if (!settings.general.showReviewPanel()) settings.general.setShowReviewPanel(true)
     if (!view().reviewPanel.opened()) view().reviewPanel.open()
   }
 

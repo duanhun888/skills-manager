@@ -989,6 +989,8 @@ export const dict = {
   "settings.general.row.shell.terminalOnly": "터미널 전용",
   "settings.general.row.showFileTree.title": "파일 트리",
   "settings.general.row.showFileTree.description": "세션에 파일 트리 패널 표시",
+  "settings.general.row.showReviewPanel.title": "Change preview",
+  "settings.general.row.showReviewPanel.description": "Show the middle change preview panel in coding sessions by default",
   "settings.general.row.showNavigation.title": "탐색 컨트롤",
   "settings.general.row.showNavigation.description": "데스크톱 제목 표시줄에 뒤로 및 앞으로 버튼 표시",
   "settings.general.row.showSearch.title": "명령 팔레트",

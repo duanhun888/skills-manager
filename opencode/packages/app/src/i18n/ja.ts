@@ -722,6 +722,8 @@ export const dict = {
   "settings.general.row.followup.option.steer": "即座に実行 (Steer)",
   "settings.general.row.showFileTree.title": "ファイルツリー",
   "settings.general.row.showFileTree.description": "セッションにファイルツリーパネルを表示します",
+  "settings.general.row.showReviewPanel.title": "Change preview",
+  "settings.general.row.showReviewPanel.description": "Show the middle change preview panel in coding sessions by default",
   "settings.general.row.showNavigation.title": "ナビゲーションコントロール",
   "settings.general.row.showNavigation.description": "デスクトップのタイトルバーに戻るボタンと進むボタンを表示します",
   "settings.general.row.showSearch.title": "コマンドパレット",

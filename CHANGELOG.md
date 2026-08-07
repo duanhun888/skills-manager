@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.4.20] - 2026-08-07
+
+### Release Overview
+- Ops-friendly coding layout: middle change preview can stay closed (directory + chat only)
+
+### User-facing
+- Settings → show change preview by default (on for developers); turn off for directory + chat only
+- Closing the middle preview no longer reopens after send / agent file edits
+- Click a changed file or the titlebar toggle to open the preview again
+
+### Developer & Governance
+- `settings.visibility.reviewPanel` gates the review column like the file tree
+- Turn-finish auto-focus respects `reviewPanel.opened`; explicit file/change clicks still open
+
 ## [1.4.19] - 2026-08-07
 
 ### Release Overview

@@ -513,7 +513,14 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
       id: "review.toggle",
       title: language.t("command.review.toggle"),
       keybind: "mod+shift+r",
-      onSelect: () => view().reviewPanel.toggle(),
+      onSelect: () => {
+        if (!settings.general.showReviewPanel()) {
+          settings.general.setShowReviewPanel(true)
+          view().reviewPanel.open()
+          return
+        }
+        view().reviewPanel.toggle()
+      },
     }),
     ...(shown()
       ? [

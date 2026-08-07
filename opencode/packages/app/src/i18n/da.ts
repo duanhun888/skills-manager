@@ -785,6 +785,8 @@ export const dict = {
   "settings.general.row.followup.option.steer": "Styr",
   "settings.general.row.showFileTree.title": "Filtræ",
   "settings.general.row.showFileTree.description": "Vis filtræspanelet i sessioner",
+  "settings.general.row.showReviewPanel.title": "Change preview",
+  "settings.general.row.showReviewPanel.description": "Show the middle change preview panel in coding sessions by default",
   "settings.general.row.showNavigation.title": "Navigationsknapper",
   "settings.general.row.showNavigation.description": "Vis tilbage- og frem-knapperne i desktopappens titellinje",
   "settings.general.row.showSearch.title": "Kommandopalette",

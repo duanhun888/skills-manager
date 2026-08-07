@@ -20,7 +20,7 @@ import { useServer } from "@/context/server"
 import { useSettings } from "@/context/settings"
 import { useSync } from "@/context/sync"
 import { useTerminal } from "@/context/terminal"
-import { focusTerminalById } from "@/pages/session/helpers"
+import { focusTerminalById, shouldShowReviewPanel } from "@/pages/session/helpers"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { messageAgentColor } from "@/utils/agent"
 import { decode64 } from "@/utils/base64"
@@ -240,8 +240,18 @@ export function SessionHeader() {
     reviewLabel: language.t("command.review.toggle"),
     reviewKeybind: reviewTooltipKeybind(command),
     reviewVisible: isDesktop(),
-    reviewOpened: view().reviewPanel.opened(),
-    onReviewToggle: () => view().reviewPanel.toggle(),
+    reviewOpened: shouldShowReviewPanel({
+      visible: settings.visibility.reviewPanel(),
+      opened: view().reviewPanel.opened(),
+    }),
+    onReviewToggle: () => {
+      if (!settings.general.showReviewPanel()) {
+        settings.general.setShowReviewPanel(true)
+        view().reviewPanel.open()
+        return
+      }
+      view().reviewPanel.toggle()
+    },
   }))
 
   const selectApp = (app: OpenApp) => {
@@ -469,12 +479,32 @@ export function SessionHeader() {
                         <Button
                           variant="ghost"
                           class="group/review-toggle titlebar-icon w-8 h-6 p-0 box-border"
-                          onClick={() => view().reviewPanel.toggle()}
+                          onClick={() => {
+                            if (!settings.general.showReviewPanel()) {
+                              settings.general.setShowReviewPanel(true)
+                              view().reviewPanel.open()
+                              return
+                            }
+                            view().reviewPanel.toggle()
+                          }}
                           aria-label={language.t("command.review.toggle")}
-                          aria-expanded={view().reviewPanel.opened()}
+                          aria-expanded={shouldShowReviewPanel({
+                            visible: settings.visibility.reviewPanel(),
+                            opened: view().reviewPanel.opened(),
+                          })}
                           aria-controls="review-panel"
                         >
-                          <Icon size="small" name={view().reviewPanel.opened() ? "review-active" : "review"} />
+                          <Icon
+                            size="small"
+                            name={
+                              shouldShowReviewPanel({
+                                visible: settings.visibility.reviewPanel(),
+                                opened: view().reviewPanel.opened(),
+                              })
+                                ? "review-active"
+                                : "review"
+                            }
+                          />
                         </Button>
                       </TooltipKeybind>
 

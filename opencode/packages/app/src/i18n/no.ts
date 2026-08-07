@@ -1083,6 +1083,8 @@ export const dict = {
   "settings.general.row.shell.terminalOnly": "kun terminal",
   "settings.general.row.showFileTree.title": "Filtre",
   "settings.general.row.showFileTree.description": "Vis filtrepanelet i sesjoner",
+  "settings.general.row.showReviewPanel.title": "Change preview",
+  "settings.general.row.showReviewPanel.description": "Show the middle change preview panel in coding sessions by default",
   "settings.general.row.showNavigation.title": "Navigasjonskontroller",
   "settings.general.row.showNavigation.description":
     "Vis tilbake- og fremoverknappene på tittellinjen i skrivebordsappen",
