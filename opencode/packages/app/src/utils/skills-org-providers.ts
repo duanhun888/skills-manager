@@ -2,6 +2,7 @@ import { createMemo, createSignal, onCleanup, onMount } from "solid-js"
 import { useServer } from "@/context/server"
 
 const SKILLS_SHARED_SUFFIX = ".skills-shared"
+const SKILLS_PERSONAL_SUFFIX = ".skills-personal"
 const POLL_MS = 60_000
 
 type OrgProviders = {
@@ -27,12 +28,21 @@ function normalizeIds(raw: unknown): string[] {
 
 function baseProviderID(id: string) {
   const normalized = id.trim().toLowerCase()
-  if (!normalized.endsWith(SKILLS_SHARED_SUFFIX)) return normalized
-  return normalized.slice(0, -SKILLS_SHARED_SUFFIX.length)
+  if (normalized.endsWith(SKILLS_SHARED_SUFFIX)) {
+    return normalized.slice(0, -SKILLS_SHARED_SUFFIX.length)
+  }
+  if (normalized.endsWith(SKILLS_PERSONAL_SUFFIX)) {
+    return normalized.slice(0, -SKILLS_PERSONAL_SUFFIX.length)
+  }
+  return normalized
 }
 
 function isSharedAlias(id: string) {
   return id.trim().toLowerCase().endsWith(SKILLS_SHARED_SUFFIX)
+}
+
+function isPersonalAlias(id: string) {
+  return id.trim().toLowerCase().endsWith(SKILLS_PERSONAL_SUFFIX)
 }
 
 async function fetchOrgProviders(
@@ -96,13 +106,16 @@ export function useSkillsOrgProviders() {
     const p = current()
     const base = baseProviderID(id)
     if (!p.provider_ids.includes(base)) return false
+    if (isPersonalAlias(id)) return false
     if (isSharedAlias(id)) return true
-    return !p.personal_ids.includes(base)
+    // Org owns the canonical provider id.
+    return true
   }
 
   const isPersonal = (providerID: string) => {
     const id = providerID.trim().toLowerCase()
     if (!id || isSharedAlias(id)) return false
+    if (isPersonalAlias(id)) return true
     const p = current()
     return p.provider_ids.includes(id) && p.personal_ids.includes(id)
   }

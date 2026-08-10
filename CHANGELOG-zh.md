@@ -1,5 +1,20 @@
 # Changelog (zh)
 
+## [1.4.22] - 2026-08-10
+
+### 发布概览
+- 组织模型密钥优先于本机旧残留：同步后中央配置占用真实 Provider ID，旧个人密钥不再挡同步
+
+### 用户可见更新
+- 登录/同步后，组织已配置的提供商以中央密钥为准；个人同名密钥会降级或从 `auth.json` 剥离（备份为 `auth.json.bak-skills`）
+- 写入 `opencode.json` 模型定义时，不再把已连接的「API 密钥」提供商误标成「配置」
+- 需求/编码侧若仍见错误模型名（如 `Qwen3.7-plus`），请改选白名单里的真实 ID（如 `alibaba-cn/qwen3.7-plus`）
+
+### 开发者与治理更新
+- Auth 合并策略改为 org-wins（canonical id）；个人冲突项使用 `.skills-personal`
+- `sync_opencode_provider_auth` 同步时清理与组织冲突的个人 `auth.json` 条目
+- 无需改配置文件名；路径仍为 `skills-org-auth.json` / `opencode.json` / `auth.json`
+
 ## [1.4.21] - 2026-08-10
 
 ### 发布概览

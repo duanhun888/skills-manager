@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.4.22] - 2026-08-10
+
+### Release Overview
+- Org credentials win over stale personal leftovers: central sync owns the real provider id so old OpenCode residue cannot block Skills Manager
+
+### User-facing
+- After login/sync, org-configured providers use central keys; colliding personal keys are demoted or stripped from `auth.json` (backup `auth.json.bak-skills`)
+- Writing model defs into `opencode.json` no longer relabels an API-key-connected provider as "config"
+- If analysis still fails on ids like `Qwen3.7-plus`, pick the allowlisted real id (e.g. `alibaba-cn/qwen3.7-plus`)
+
+### Developer & Governance
+- Auth merge is org-wins (canonical id); personal collisions use `.skills-personal`
+- `sync_opencode_provider_auth` strips conflicting personal `auth.json` entries on sync
+- Config filenames stay the same (`skills-org-auth.json` / `opencode.json` / `auth.json`) — renaming is not required
+
 ## [1.4.21] - 2026-08-10
 
 ### Release Overview

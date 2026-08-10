@@ -1211,7 +1211,9 @@ export function options(input: {
   // deepseek-r1, etc. never output thinking/reasoning tokens.
   // Note: kimi-k2-thinking is excluded as it returns reasoning_content by default.
   if (
-    (input.model.providerID === "alibaba-cn" || input.model.providerID === "alibaba-cn.skills-shared") &&
+    (input.model.providerID === "alibaba-cn" ||
+      input.model.providerID === "alibaba-cn.skills-shared" ||
+      input.model.providerID === "alibaba-cn.skills-personal") &&
     input.model.capabilities.reasoning &&
     input.model.api.npm === "@ai-sdk/openai-compatible" &&
     !modelId.includes("kimi-k2-thinking")

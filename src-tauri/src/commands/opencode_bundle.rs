@@ -814,6 +814,52 @@ fn merge_org_provider_models_into_config(
     root
 }
 
+fn strip_personal_auth_for_org_providers(org_ids: &[String]) -> Option<String> {
+    if org_ids.is_empty() {
+        return None;
+    }
+    let path = opencode_user_data_dir().join("auth.json");
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return None;
+    };
+    let Ok(mut value) = serde_json::from_str::<serde_json::Value>(&text) else {
+        return None;
+    };
+    let Some(obj) = value.as_object_mut() else {
+        return None;
+    };
+    let org_set: std::collections::HashSet<String> = org_ids
+        .iter()
+        .map(|id| id.trim().to_ascii_lowercase())
+        .filter(|id| !id.is_empty())
+        .collect();
+    let remove_keys: Vec<String> = obj
+        .keys()
+        .filter(|key| org_set.contains(&key.trim().to_ascii_lowercase()))
+        .cloned()
+        .collect();
+    if remove_keys.is_empty() {
+        return None;
+    }
+    let backup = path.with_extension("json.bak-skills");
+    let _ = std::fs::write(&backup, &text);
+    for key in &remove_keys {
+        obj.remove(key);
+    }
+    let Ok(next) = serde_json::to_string_pretty(&value) else {
+        return None;
+    };
+    if std::fs::write(&path, format!("{next}\n")).is_ok() {
+        Some(format!(
+            "stripped personal auth for {} (backup {})",
+            remove_keys.join(","),
+            backup.display()
+        ))
+    } else {
+        None
+    }
+}
+
 fn write_org_provider_models_config(
     models_by_provider: &serde_json::Map<String, serde_json::Value>,
 ) -> Vec<String> {
@@ -844,7 +890,8 @@ fn write_org_provider_models_config(
 }
 
 /// Write org provider API keys to a separate file (skills-org-auth.json).
-/// Does not overwrite personal auth.json — OpenCode prefers personal keys, then falls back to org shared.
+/// Org credentials own the canonical provider id; colliding personal keys in auth.json
+/// are stripped (backup: auth.json.bak-skills) so stale OpenCode leftovers cannot block sync.
 /// Also merges org model definitions into user/managed `opencode.json` so models missing from
 /// models.dev (e.g. glm-4.6v-flash) appear for every synced client.
 #[tauri::command]
@@ -944,6 +991,10 @@ pub async fn sync_opencode_provider_auth(
         let config_written = write_org_provider_models_config(&models_map);
         if !config_written.is_empty() {
             written.extend(config_written);
+        }
+
+        if let Some(stripped) = strip_personal_auth_for_org_providers(&org_ids) {
+            written.push(stripped);
         }
 
         Ok(format!(

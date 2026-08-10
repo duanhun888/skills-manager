@@ -4,7 +4,7 @@ import { existsSync, readFileSync, statSync } from "fs"
 import path from "path"
 import { ConfigManaged } from "./managed"
 import { Global } from "@opencode-ai/core/global"
-import { isSkillsSharedProviderID, skillsBaseProviderID } from "@/auth/skills-shared"
+import { isSkillsSharedProviderID, isSkillsPersonalProviderID, skillsBaseProviderID } from "@/auth/skills-shared"
 
 export type Info = {
   /** Providers with org-shared credentials available (base ids). */
@@ -143,22 +143,26 @@ export function current(): Info {
   return info
 }
 
-/** Show 共享 on org-only id, or on `{id}.skills-shared` when personal also exists. */
+/** Show 共享 on the org-owned provider id (canonical id, or legacy `.skills-shared`). */
 export function isSharedProvider(providerID: string): boolean {
   const id = providerID.trim().toLowerCase()
   if (!id) return false
   const info = current()
   const base = skillsBaseProviderID(id).toLowerCase()
   if (!info.providerIds.includes(base)) return false
+  if (isSkillsPersonalProviderID(id)) return false
   if (isSkillsSharedProviderID(id)) return true
-  return !info.personalIds.includes(base)
+  // Org owns the real id; personal leftovers (if any) live under `.skills-personal`.
+  return true
 }
 
-/** Personal entry for a provider that also has org share (switchable pair). */
+/** Personal entry demoted when org also provides the same provider. */
 export function isPersonalOverrideProvider(providerID: string): boolean {
   const id = providerID.trim().toLowerCase()
   if (!id || isSkillsSharedProviderID(id)) return false
+  if (isSkillsPersonalProviderID(id)) return true
   const info = current()
+  // Legacy: before org-wins, personal kept the real id alongside org share.
   return info.providerIds.includes(id) && info.personalIds.includes(id)
 }
 

@@ -5,13 +5,16 @@ import { NonNegativeInt } from "@opencode-ai/core/schema"
 import { Global } from "@opencode-ai/core/global"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { ConfigManaged } from "@/config/managed"
-import { isSkillsSharedProviderID, skillsBaseProviderID, skillsSharedProviderID } from "./skills-shared"
+import { isSkillsSharedProviderID, skillsBaseProviderID, skillsPersonalProviderID } from "./skills-shared"
 
 export {
   isSkillsSharedProviderID,
+  isSkillsPersonalProviderID,
   skillsBaseProviderID,
   skillsSharedProviderID,
+  skillsPersonalProviderID,
   SKILLS_SHARED_SUFFIX,
+  SKILLS_PERSONAL_SUFFIX,
 } from "./skills-shared"
 
 export const OAUTH_DUMMY_KEY = "opencode-oauth-dummy-key"
@@ -109,17 +112,19 @@ const layer = Layer.effect(
 
     /**
      * Merged credentials for runtime.
-     * Org shared and personal keys can both be selected:
-     * - only one source → real provider id
-     * - both → personal keeps real id (custom name); org is exposed as `{id}.skills-shared`
+     * Central org keys win the canonical provider id so stale personal leftovers
+     * (old OpenCode installs) cannot block Skills Manager sync.
+     * - org only → real id
+     * - personal only → real id
+     * - both → org keeps real id; personal exposed as `{id}.skills-personal`
      */
     const all = Effect.fn("Auth.all")(function* () {
       const shared = yield* org()
       const own = yield* personal()
-      const out: Record<string, Info> = { ...shared }
-      for (const [id, info] of Object.entries(own)) {
+      const out: Record<string, Info> = { ...own }
+      for (const [id, info] of Object.entries(shared)) {
         if (out[id]) {
-          out[skillsSharedProviderID(id)] = out[id]
+          out[skillsPersonalProviderID(id)] = out[id]
         }
         out[id] = info
       }

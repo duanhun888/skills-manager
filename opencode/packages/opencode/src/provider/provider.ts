@@ -12,7 +12,7 @@ import { serviceUse } from "@opencode-ai/core/effect/service-use"
 import { type LanguageModelV3 } from "@ai-sdk/provider"
 import { ModelsDev } from "@opencode-ai/core/models-dev"
 import { Auth } from "../auth"
-import { SKILLS_SHARED_SUFFIX, skillsBaseProviderID } from "../auth/skills-shared"
+import { SKILLS_SHARED_SUFFIX, SKILLS_PERSONAL_SUFFIX, skillsBaseProviderID } from "../auth/skills-shared"
 import { SkillsOrgProviders } from "@/config/org-providers"
 import { Env } from "../env"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
@@ -1531,9 +1531,10 @@ const layer = Layer.effect(
 
         // load apikeys
         const auths = yield* auth.all().pipe(Effect.orDie)
-        // When personal + org collide, org is exposed as `{id}.skills-shared` — clone catalog entry.
+        // When personal + org collide, demoted personal uses `{id}.skills-personal`.
+        // Legacy installs may still expose org under `{id}.skills-shared`.
         for (const id of Object.keys(auths)) {
-          if (!id.endsWith(SKILLS_SHARED_SUFFIX)) continue
+          if (!id.endsWith(SKILLS_SHARED_SUFFIX) && !id.endsWith(SKILLS_PERSONAL_SUFFIX)) continue
           const baseID = skillsBaseProviderID(id)
           const base = database[baseID]
           if (!base || database[id]) continue
@@ -1603,10 +1604,15 @@ const layer = Layer.effect(
           }
         }
 
-        // load config - re-apply with updated data
+        // load config options — do not downgrade an api/env-connected provider to "config"
+        // (Skills Manager writes model defs into opencode.json; source must stay "api").
         for (const [id, provider] of configProviders) {
           const providerID = ProviderV2.ID.make(id)
-          const partial: Partial<Info> = { source: "config" }
+          const existing = providers[providerID]
+          const partial: Partial<Info> = {}
+          if (!existing || (existing.source !== "api" && existing.source !== "env")) {
+            partial.source = "config"
+          }
           if (provider.env) partial.env = provider.env
           if (provider.name) partial.name = provider.name
           if (provider.options) partial.options = provider.options
