@@ -108,14 +108,14 @@
       "providerId": "Provider ID",
       "apiKey": "API Key",
       "models": "允許的模型（必填）",
-      "modelsHint": "每行一個模型 ID，如 qwen3.7-plus 或 alibaba-cn/qwen3.7-plus。只有列出的模型才會以「共享」展現可用。",
+      "modelsHint": "每行一個模型 ID，如 glm-4.6v-flash 或 qwen3.7-plus。儲存後會寫入本機/託管 opencode.json，目錄裡沒有的模型也會自動註冊；只有列出的模型才會以「共享」可用。",
       "modelsRequired": "請為 {{provider}} 至少填寫一個允許的模型",
       "add": "新增 Provider",
       "remove": "刪除",
       "save": "儲存並下發",
       "saved": "模型密鑰已儲存並同步到本機",
       "opsOnly": "僅運維（ops）可修改模型密鑰",
-      "hint": "常用 Provider：alibaba-cn、deepseek。共享密鑰按模型白名單生效，降低整站模型被濫用的風險。"
+      "hint": "常用 Provider：zhipuai、alibaba-cn、deepseek。範例：Provider=zhipuai，模型填 glm-4.6v-flash。共享密鑰按模型白名單生效。"
     },
     "users": {
       "create": "新建用戶",
@@ -789,7 +789,7 @@
     "imagePrioritySaved": "識圖優先級已儲存",
     "help": "說明",
     "about": "關於",
-    "version": "芯宏Skills仓库 V1.4.20",
+    "version": "芯宏Skills仓库 V1.4.21",
     "tagline": "跨平台。極簡、高效、無感多組合切換。",
     "checkUpdate": "檢查更新",
     "checking": "檢查中…",

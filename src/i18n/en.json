@@ -108,14 +108,14 @@
       "providerId": "Provider ID",
       "apiKey": "API Key",
       "models": "Allowed models (required)",
-      "modelsHint": "One model id per line, e.g. qwen3.7-plus or alibaba-cn/qwen3.7-plus. Only listed models are exposed as Shared.",
+      "modelsHint": "One model id per line, e.g. glm-4.6v-flash or qwen3.7-plus. Sync also registers models into local/managed opencode.json (even if missing from models.dev). Only listed models appear as Shared.",
       "modelsRequired": "Add at least one allowed model for {{provider}}",
       "add": "Add provider",
       "remove": "Remove",
       "save": "Save and sync",
       "saved": "Model keys saved and synced locally",
       "opsOnly": "Only ops can change model keys",
-      "hint": "Common providers: alibaba-cn, deepseek. Shared keys are model-scoped to reduce misuse risk."
+      "hint": "Common providers: zhipuai, alibaba-cn, deepseek. Example: provider=zhipuai, models=glm-4.6v-flash. Shared keys are model-scoped."
     },
     "users": {
       "create": "New user",
@@ -843,7 +843,7 @@
     "imagePrioritySaved": "Image priority saved",
     "help": "Help",
     "about": "About",
-    "version": "芯宏Skills仓库 V1.4.20",
+    "version": "芯宏Skills仓库 V1.4.21",
     "tagline": "Cross-platform. Minimal, efficient, seamless multi-set switching.",
     "checkUpdate": "Check for Updates",
     "checking": "Checking…",

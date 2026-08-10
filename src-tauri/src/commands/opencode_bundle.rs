@@ -672,8 +672,181 @@ fn opencode_user_data_dir() -> PathBuf {
         .join("opencode")
 }
 
+/// Pretty-print a model id for OpenCode model picker labels.
+fn model_display_name(model_id: &str) -> String {
+    let trimmed = model_id.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+    let lower = trimmed.to_ascii_lowercase();
+    if lower.starts_with("glm-") {
+        let mut out = String::from("GLM-");
+        let rest: Vec<char> = lower[4..].chars().collect();
+        for i in 0..rest.len() {
+            let ch = rest[i];
+            if ch == 'v' && i > 0 && rest[i - 1].is_ascii_digit() {
+                out.push('V');
+                continue;
+            }
+            if i == 0 || rest[i - 1] == '-' || rest[i - 1] == '_' {
+                for c in ch.to_uppercase() {
+                    out.push(c);
+                }
+                continue;
+            }
+            out.push(ch);
+        }
+        return out;
+    }
+    // Keep known product casing when possible (e.g. qwen-plus → Qwen-Plus).
+    let mut out = String::with_capacity(trimmed.len());
+    let mut upper = true;
+    for ch in trimmed.chars() {
+        if ch == '-' || ch == '_' {
+            out.push(ch);
+            upper = true;
+            continue;
+        }
+        if upper {
+            for c in ch.to_uppercase() {
+                out.push(c);
+            }
+            upper = false;
+        } else {
+            out.push(ch);
+        }
+    }
+    out
+}
+
+/// Heuristic: multimodal / vision-capable model ids (GLM-*-V*, *-vl*, vision, …).
+fn looks_like_vision_model(model_id: &str) -> bool {
+    let id = model_id.trim().to_ascii_lowercase();
+    if id.is_empty() {
+        return false;
+    }
+    if id.contains("vision") || id.contains("vlm") || id.contains("-vl") || id.contains("_vl") {
+        return true;
+    }
+    // glm-4.6v / glm-4.6v-flash / qwen2.5-vl-…
+    let bytes = id.as_bytes();
+    for i in 0..bytes.len() {
+        if bytes[i] != b'v' {
+            continue;
+        }
+        let prev_digit = i > 0 && bytes[i - 1].is_ascii_digit();
+        let next_ok = i + 1 >= bytes.len() || matches!(bytes[i + 1], b'-' | b'_' | b'.');
+        if prev_digit && next_ok {
+            return true;
+        }
+    }
+    false
+}
+
+fn model_config_entry(model_id: &str) -> serde_json::Value {
+    let name = model_display_name(model_id);
+    if looks_like_vision_model(model_id) {
+        return serde_json::json!({
+            "name": name,
+            "attachment": true,
+            "tool_call": true,
+            "modalities": {
+                "input": ["text", "image"],
+                "output": ["text"]
+            }
+        });
+    }
+    serde_json::json!({
+        "name": name,
+        "tool_call": true
+    })
+}
+
+/// Merge org-shared provider model definitions into an OpenCode config JSON object.
+/// Only upserts `provider.<id>.models.<model>`; preserves unrelated user settings.
+fn merge_org_provider_models_into_config(
+    existing: &serde_json::Value,
+    models_by_provider: &serde_json::Map<String, serde_json::Value>,
+) -> serde_json::Value {
+    let mut root = if existing.is_object() {
+        existing.clone()
+    } else {
+        serde_json::json!({})
+    };
+    let obj = root.as_object_mut().expect("root object");
+    obj.entry("$schema")
+        .or_insert_with(|| serde_json::json!("https://opencode.ai/config.json"));
+
+    let provider = obj
+        .entry("provider")
+        .or_insert_with(|| serde_json::json!({}))
+        .as_object_mut();
+    let Some(provider) = provider else {
+        return root;
+    };
+
+    for (provider_id, models_value) in models_by_provider {
+        let Some(models) = models_value.as_array() else {
+            continue;
+        };
+        let provider_obj = provider
+            .entry(provider_id.clone())
+            .or_insert_with(|| serde_json::json!({}))
+            .as_object_mut();
+        let Some(provider_obj) = provider_obj else {
+            continue;
+        };
+        let models_obj = provider_obj
+            .entry("models")
+            .or_insert_with(|| serde_json::json!({}))
+            .as_object_mut();
+        let Some(models_obj) = models_obj else {
+            continue;
+        };
+        for model in models {
+            let Some(model_id) = model.as_str().map(str::trim).filter(|s| !s.is_empty()) else {
+                continue;
+            };
+            models_obj.insert(model_id.to_string(), model_config_entry(model_id));
+        }
+    }
+
+    root
+}
+
+fn write_org_provider_models_config(
+    models_by_provider: &serde_json::Map<String, serde_json::Value>,
+) -> Vec<String> {
+    if models_by_provider.is_empty() {
+        return Vec::new();
+    }
+    let mut written = Vec::new();
+    for path in [
+        opencode_user_config_dir().join("opencode.json"),
+        opencode_managed_config_dir().join("opencode.json"),
+    ] {
+        let existing = std::fs::read_to_string(&path)
+            .ok()
+            .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+            .unwrap_or_else(|| serde_json::json!({}));
+        let merged = merge_org_provider_models_into_config(&existing, models_by_provider);
+        let Ok(text) = serde_json::to_string_pretty(&merged) else {
+            continue;
+        };
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        if std::fs::write(&path, format!("{text}\n")).is_ok() {
+            written.push(path.display().to_string());
+        }
+    }
+    written
+}
+
 /// Write org provider API keys to a separate file (skills-org-auth.json).
 /// Does not overwrite personal auth.json — OpenCode prefers personal keys, then falls back to org shared.
+/// Also merges org model definitions into user/managed `opencode.json` so models missing from
+/// models.dev (e.g. glm-4.6v-flash) appear for every synced client.
 #[tauri::command]
 pub async fn sync_opencode_provider_auth(
     auth: OpenCodeProviderAuthDto,
@@ -768,6 +941,11 @@ pub async fn sync_opencode_provider_auth(
             let _ = std::fs::write(&marker_path, &marker_text);
         }
 
+        let config_written = write_org_provider_models_config(&models_map);
+        if !config_written.is_empty() {
+            written.extend(config_written);
+        }
+
         Ok(format!(
             "{} ({} shared providers)",
             written.join("; "),
@@ -776,4 +954,61 @@ pub async fn sync_opencode_provider_auth(
     })
     .await
     .map_err(|e| AppError::io(format!("join error: {e}")))?
+}
+
+#[cfg(test)]
+mod org_provider_models_config_tests {
+    use super::{
+        looks_like_vision_model, merge_org_provider_models_into_config, model_display_name,
+    };
+    use serde_json::json;
+
+    #[test]
+    fn display_name_title_cases_segments() {
+        assert_eq!(model_display_name("glm-4.6v-flash"), "GLM-4.6V-Flash");
+        assert_eq!(model_display_name("glm-5.2"), "GLM-5.2");
+    }
+
+    #[test]
+    fn vision_heuristic_matches_glm_v_flash() {
+        assert!(looks_like_vision_model("glm-4.6v-flash"));
+        assert!(looks_like_vision_model("glm-4.6v"));
+        assert!(!looks_like_vision_model("glm-5.2"));
+        assert!(!looks_like_vision_model("qwen-plus"));
+    }
+
+    #[test]
+    fn merge_upserts_models_without_wiping_other_keys() {
+        let existing = json!({
+            "$schema": "https://opencode.ai/config.json",
+            "theme": "dark",
+            "provider": {
+                "zhipuai": {
+                    "models": {
+                        "glm-5.2": { "name": "Keep Me" }
+                    }
+                }
+            }
+        });
+        let mut models = serde_json::Map::new();
+        models.insert(
+            "zhipuai".into(),
+            json!(["glm-4.6v-flash", "glm-5.2"]),
+        );
+        let merged = merge_org_provider_models_into_config(&existing, &models);
+        assert_eq!(merged["theme"], "dark");
+        assert_eq!(
+            merged["provider"]["zhipuai"]["models"]["glm-4.6v-flash"]["name"],
+            "GLM-4.6V-Flash"
+        );
+        assert_eq!(
+            merged["provider"]["zhipuai"]["models"]["glm-4.6v-flash"]["attachment"],
+            true
+        );
+        // Org sync overwrites the shared model entry with generated metadata.
+        assert_eq!(
+            merged["provider"]["zhipuai"]["models"]["glm-5.2"]["name"],
+            "GLM-5.2"
+        );
+    }
 }

@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.4.21] - 2026-08-10
+
+### Release Overview
+- Org model keys now register missing models (e.g. Zhipu GLM-4.6V-Flash) into local/managed OpenCode config on sync
+
+### User-facing
+- After ops saves Provider keys + allowlisted models, clients get them in `opencode.json` automatically
+- Vision-like model ids (e.g. `glm-4.6v-flash`) are registered with image attachment capability
+- Admin credentials copy mentions Zhipu / `glm-4.6v-flash` setup
+
+### Developer & Governance
+- `sync_opencode_provider_auth` merges org models into user and ProgramData `opencode.json` without wiping other settings
+- Unit tests cover display names, vision heuristic, and config merge
+
 ## [1.4.20] - 2026-08-07
 
 ### Release Overview
