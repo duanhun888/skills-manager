@@ -66,6 +66,7 @@ import {
   modelSupportsImages,
   parseCodingImagePriority,
   parseProviderModel,
+  FIXED_CODING_OCR_URL,
   useSkillsModelPolicy,
 } from "@/utils/skills-model-policy"
 import {
@@ -1808,7 +1809,7 @@ export default function Page() {
         vision: (() => {
           const policy = skillsPolicy.policy()
           const visionModel = parseProviderModel(policy.coding_vision_model)
-          const ocrUrl = policy.coding_ocr_url?.trim() || undefined
+          const ocrUrl = FIXED_CODING_OCR_URL
           const priority = parseCodingImagePriority(policy.coding_image_priority)
           const pipelineReady =
             (priority === "ocr_only" && !!ocrUrl) ||

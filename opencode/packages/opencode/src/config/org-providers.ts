@@ -5,6 +5,7 @@ import path from "path"
 import { ConfigManaged } from "./managed"
 import { Global } from "@opencode-ai/core/global"
 import { isSkillsSharedProviderID, isSkillsPersonalProviderID, skillsBaseProviderID } from "@/auth/skills-shared"
+import { SkillsModelPolicy } from "./model-policy"
 
 export type Info = {
   /** Providers with org-shared credentials available (base ids). */
@@ -181,7 +182,20 @@ export function allowedModelsForSharedProvider(providerID: string): string[] | n
 export function isModelAllowedForSharedProvider(providerID: string, modelID: string): boolean {
   const allow = allowedModelsForSharedProvider(providerID)
   if (allow === null) return true
-  if (allow.length === 0) return false
   const base = skillsBaseProviderID(providerID)
+  // Always keep the org coding vision model usable for DeepSeek/personal text models
+  // that route screenshots through the VL describe pipeline.
+  const visionRaw = SkillsModelPolicy.current().codingVisionModel?.trim()
+  if (visionRaw) {
+    const slash = visionRaw.indexOf("/")
+    if (slash > 0) {
+      const visionProvider = skillsBaseProviderID(visionRaw.slice(0, slash)).toLowerCase()
+      const visionModel = visionRaw.slice(slash + 1).trim()
+      if (visionProvider === base.toLowerCase() && modelAllowed(visionModel, base, modelID)) {
+        return true
+      }
+    }
+  }
+  if (allow.length === 0) return false
   return allow.some((entry) => modelAllowed(entry, base, modelID))
 }

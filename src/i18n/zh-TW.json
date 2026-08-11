@@ -89,7 +89,7 @@
       "modelsHint": "每行一個。優先填真實 ID：OpenCode → 管理模型（本機常見 alibaba-cn/qwen3.7-plus，不是顯示名）。也可只寫模型 ID。下發時會自動展開 alibaba / alibaba-cn / opencode 別名。",
       "modelsRequired": "限制模式下至少填寫一個模型",
       "codingOcr": "編碼區 OCR 服務",
-      "codingOcrHint": "可選。PaddleX OCR 位址（如 http://192.168.1.230:8080）。OpenCode 從客戶端直連，需 CORS。留空則不能走 OCR。",
+      "codingOcrHint": "組織固定 OCR 位址（唯讀）。OpenCode 從客戶端直連，需內網可達並開啟 CORS。",
       "codingVision": "編碼區識圖模型（VL）",
       "codingVisionHint": "可選。視覺模型真實 ID，如 alibaba-cn/qwen3-vl-plus。是否先用 OCR 或 VL 由下方優先級決定。",
       "imagePriority": "識圖優先級",

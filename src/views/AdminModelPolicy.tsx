@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useAuth } from "../context/useAuth";
 import {
   fetchServerPublicConfig,
+  FIXED_CODING_OCR_URL,
   getStoredToken,
   updateServerModelPolicy,
   userIsOps,
@@ -47,16 +48,13 @@ export function AdminModelPolicy() {
     setLoading(true);
     try {
       const cfg = await fetchServerPublicConfig(serverApiUrl);
-      // Central may omit or return stale OCR fields — prefer last admin-saved local cache.
-      const cachedOcr =
-        (await getSettings("org_coding_ocr_url").catch(() => null))?.trim() || "";
       const cachedPriority =
         (await getSettings("org_coding_image_priority").catch(() => null))?.trim() || "";
       setMode(cfg.model_policy_mode === "restricted" ? "restricted" : "open");
       const models = cfg.requirements_only_models ?? [];
       setModelsText(models.length > 0 ? models.join("\n") : DEFAULT_MODELS);
       setCodingVisionModel(cfg.coding_vision_model?.trim() || "");
-      setCodingOcrUrl(cachedOcr || cfg.coding_ocr_url?.trim() || "");
+      setCodingOcrUrl(FIXED_CODING_OCR_URL);
       setImagePriority(parseImagePriority(cachedPriority || cfg.coding_image_priority));
     } catch (err) {
       toast.error(getErrorMessage(err, t("common.error")));
@@ -81,7 +79,7 @@ export function AdminModelPolicy() {
     }
     setSaving(true);
     try {
-      const ocrUrl = codingOcrUrl.trim();
+      const ocrUrl = FIXED_CODING_OCR_URL;
       const cfg = await updateServerModelPolicy(serverApiUrl, token, {
         mode,
         requirements_only_models: models,
@@ -95,7 +93,7 @@ export function AdminModelPolicy() {
         mode: cfg.model_policy_mode === "restricted" ? "restricted" : "open",
         requirements_only_models: cfg.requirements_only_models ?? models,
         coding_vision_model: cfg.coding_vision_model?.trim() || codingVisionModel.trim() || null,
-        coding_ocr_url: ocrUrl || null,
+        coding_ocr_url: ocrUrl,
         coding_image_priority: imagePriority,
       });
       // Keep the values just saved — server reload often cannot echo OCR yet.
@@ -190,10 +188,9 @@ export function AdminModelPolicy() {
         <input
           id="coding-ocr-url"
           type="text"
-          className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm font-mono"
-          value={codingOcrUrl}
-          onChange={(e) => setCodingOcrUrl(e.target.value)}
-          placeholder="http://192.168.1.230:8080"
+          className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm font-mono opacity-80"
+          value={FIXED_CODING_OCR_URL}
+          readOnly
           spellCheck={false}
         />
       </div>

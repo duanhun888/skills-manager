@@ -32,6 +32,7 @@ import {
   modelSupportsImages,
   parseCodingImagePriority,
   parseProviderModel,
+  FIXED_CODING_OCR_URL,
   useSkillsModelPolicy,
 } from "@/utils/skills-model-policy"
 
@@ -87,6 +88,23 @@ const draftText = (prompt: Prompt) => prompt.map((part) => ("content" in part ? 
 
 const draftImages = (prompt: Prompt) => prompt.filter((part): part is ImageAttachmentPart => part.type === "image")
 
+function visionProviderCandidates(providerID: string): string[] {
+  const id = providerID.trim()
+  if (!id) return []
+  const base = id
+    .replace(/\.skills-shared$/i, "")
+    .replace(/\.skills-personal$/i, "")
+  const out = [id]
+  for (const candidate of [base, `${base}.skills-shared`, `${base}.skills-personal`]) {
+    if (!out.includes(candidate)) out.push(candidate)
+  }
+  return out
+}
+
+function promptErrorMessage(err: unknown): string {
+  return formatServerError(err) || (err instanceof Error ? err.message : String(err))
+}
+
 async function resolveVisionDescription(input: {
   client: DirectorySDK["client"]
   draft: FollowupDraft
@@ -99,45 +117,58 @@ async function resolveVisionDescription(input: {
     throw new Error("vision model not configured")
   }
 
-  const visionMessageID = Identifier.ascending("message")
   const visionText = buildVisionDescribeUserText(input.text, input.vision.locale)
-  const { requestParts } = buildRequestParts({
-    prompt: input.draft.prompt,
-    context: input.draft.context,
-    images: input.images,
-    text: visionText,
-    sessionID: input.draft.sessionID,
-    messageID: visionMessageID,
-    sessionDirectory: input.draft.sessionDirectory,
-  })
+  const system = visionDescribeSystem(visionDescribeMode(input.text))
+  let lastError = ""
 
-  const visionResult = await input.client.session.prompt({
-    sessionID: input.draft.sessionID,
-    agent: "requirements",
-    model: {
-      providerID: model.providerID,
-      modelID: model.modelID,
-    },
-    system: visionDescribeSystem(visionDescribeMode(input.text)),
-    parts: requestParts,
-  })
+  for (const providerID of visionProviderCandidates(model.providerID)) {
+    const visionMessageID = Identifier.ascending("message")
+    const { requestParts } = buildRequestParts({
+      prompt: input.draft.prompt,
+      context: input.draft.context,
+      images: input.images,
+      text: visionText,
+      sessionID: input.draft.sessionID,
+      messageID: visionMessageID,
+      sessionDirectory: input.draft.sessionDirectory,
+    })
 
-  let description = collectAssistantText(visionResult.data?.parts)
-  if (!description) {
     try {
-      const messages = await input.client.session.messages({ sessionID: input.draft.sessionID, limit: 8 })
-      const rows = messages.data ?? []
-      for (let i = rows.length - 1; i >= 0; i--) {
-        const row = rows[i] as { info?: { role?: string }; parts?: unknown }
-        if (row?.info?.role !== "assistant") continue
-        description = collectAssistantText(row.parts)
-        if (description) break
+      const visionResult = await input.client.session.prompt({
+        sessionID: input.draft.sessionID,
+        agent: "requirements",
+        model: {
+          providerID,
+          modelID: model.modelID,
+        },
+        system,
+        parts: requestParts,
+      })
+
+      let description = collectAssistantText(visionResult.data?.parts)
+      if (!description) {
+        try {
+          const messages = await input.client.session.messages({ sessionID: input.draft.sessionID, limit: 8 })
+          const rows = messages.data ?? []
+          for (let i = rows.length - 1; i >= 0; i--) {
+            const row = rows[i] as { info?: { role?: string }; parts?: unknown }
+            if (row?.info?.role !== "assistant") continue
+            description = collectAssistantText(row.parts)
+            if (description) break
+          }
+        } catch {
+          // keep empty
+        }
       }
-    } catch {
-      // keep empty
+      if (description) return description
+      lastError = "empty"
+    } catch (err) {
+      lastError = promptErrorMessage(err) || "request_failed"
+      console.warn("[coding-vision] describe failed", { providerID, modelID: model.modelID, error: lastError })
     }
   }
-  return description
+
+  throw new Error(lastError || "vision describe failed")
 }
 
 /** Pass1: describe images via OCR and/or VL according to configured priority. */
@@ -175,9 +206,15 @@ async function resolveImageDescription(input: {
   const runVl = async (): Promise<{ text: string; source: "vl" } | { ok: false; reason: string }> => {
     if (!visionReady) return { ok: false, reason: "no_vision_model" }
     input.vision.onDescribeStart?.()
-    const description = await resolveVisionDescription(input)
-    if (!description) return { ok: false, reason: "empty" }
-    return { text: description, source: "vl" }
+    try {
+      const description = await resolveVisionDescription(input)
+      if (!description) return { ok: false, reason: "empty" }
+      return { text: description, source: "vl" }
+    } catch (err) {
+      const reason = promptErrorMessage(err) || "request_failed"
+      console.warn("[coding-vision] VL failed → may fallback OCR", { reason })
+      return { ok: false, reason }
+    }
   }
 
   if (priority === "ocr_only") {
@@ -795,7 +832,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
 
     const policy = skillsPolicy.policy()
     const visionModel = parseProviderModel(policy.coding_vision_model)
-    const ocrUrl = policy.coding_ocr_url?.trim() || undefined
+    const ocrUrl = FIXED_CODING_OCR_URL
     const priority = parseCodingImagePriority(policy.coding_image_priority)
 
     const pipelineReady =

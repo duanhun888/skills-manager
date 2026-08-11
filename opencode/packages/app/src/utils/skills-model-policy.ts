@@ -1,6 +1,9 @@
 import { createMemo, createSignal, onCleanup, onMount } from "solid-js"
 import { useServer } from "@/context/server"
 
+/** Org-fixed PaddleX OCR — keeps coding识图 working when policy file is empty/wrong. */
+export const FIXED_CODING_OCR_URL = "http://192.168.1.230"
+
 export type SkillsModelPolicy = {
   mode: "open" | "restricted"
   requirements_only_models: string[]
@@ -101,7 +104,8 @@ function parsePolicy(
 ): SkillsModelPolicy {
   const vision =
     typeof data.coding_vision_model === "string" ? data.coding_vision_model.trim() : ""
-  const ocr = typeof data.coding_ocr_url === "string" ? data.coding_ocr_url.trim() : ""
+  // Always pin OCR — ignore stale/empty/wrong values from disk or central config.
+  const ocr = FIXED_CODING_OCR_URL
   const priority =
     typeof data.coding_image_priority === "string"
       ? parseCodingImagePriority(data.coding_image_priority)
@@ -112,7 +116,7 @@ function parsePolicy(
       ? data.requirements_only_models.filter((x): x is string => typeof x === "string")
       : [],
     coding_vision_model: vision || undefined,
-    coding_ocr_url: ocr || undefined,
+    coding_ocr_url: ocr,
     coding_image_priority: priority,
   }
 }

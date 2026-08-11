@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.4.23] - 2026-08-10
+
+### Release Overview
+- Pin central API + OCR URLs to stop config drift; personal text models with images fall back to OCR when VL fails
+
+### User-facing
+- Central API fixed to `http://139.159.158.220:8088` (Settings URL editor hidden)
+- OCR fixed to `http://192.168.1.230` (admin read-only; sync/coding always use it)
+- Personal coding models with attachments fall back to OCR when org vision describe throws
+- Vision retries provider aliases; org coding vision model stays available even if missing from allowlist
+
+### Developer & Governance
+- `SERVER_API_URL_FIXED` + `FIXED_CODING_OCR_URL`
+- `resolveImageDescription` catches VL exceptions before OCR fallback
+- `isModelAllowedForSharedProvider` always allows `coding_vision_model`
+
 ## [1.4.22] - 2026-08-10
 
 ### Release Overview

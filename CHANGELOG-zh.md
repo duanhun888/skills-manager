@@ -1,5 +1,21 @@
 # Changelog (zh)
 
+## [1.4.23] - 2026-08-10
+
+### 发布概览
+- 中央 API 与 OCR 地址写死，避免配置漂移；个人文本模型发图时识图失败可回退 OCR
+
+### 用户可见更新
+- 中央服务器固定为 `http://139.159.158.220:8088`（设置里不再改地址）
+- OCR 固定为 `http://192.168.1.230`（管理端只读；同步/识图始终用此地址）
+- 选「个人」编码模型带图发送时，组织识图抛错会按策略改用 OCR
+- 识图会依次尝试 Provider 别名；组织识图模型即使未进白名单也会保留
+
+### 开发者与治理更新
+- `SERVER_API_URL_FIXED` + `FIXED_CODING_OCR_URL`
+- `resolveImageDescription` 捕获 VL 异常后再走 OCR
+- `isModelAllowedForSharedProvider` 放行 `coding_vision_model`
+
 ## [1.4.22] - 2026-08-10
 
 ### 发布概览

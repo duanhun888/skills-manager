@@ -1,14 +1,19 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getErrorMessage } from "./error";
 
-/** Default central API URL for local / open-source builds (user can change in Settings). */
-export const DEFAULT_SERVER_API_URL = "http://127.0.0.1:8088";
+/** Org central API — fixed for this product build. */
+export const DEFAULT_SERVER_API_URL = "http://139.159.158.220:8088";
 
 /**
  * When true, always use DEFAULT_SERVER_API_URL and hide the Settings URL editor.
- * Keep false for public builds so each org configures its own server.
  */
-export const SERVER_API_URL_FIXED = false;
+export const SERVER_API_URL_FIXED = true;
+
+/**
+ * Org PaddleX OCR base URL (OpenCode appends `/ocr`).
+ * Forced on every policy sync so empty/wrong admin values cannot break coding识图.
+ */
+export const FIXED_CODING_OCR_URL = "http://192.168.1.230";
 
 export const AUTH_TOKEN_KEY = "skills_manager_auth_token";
 

@@ -603,12 +603,16 @@ const layer = Layer.effect(
       const err = Cause.squash(exit.cause)
       if (Provider.ModelNotFoundError.isInstance(err)) {
         const hint = err.suggestions?.length ? ` Did you mean: ${err.suggestions.join(", ")}?` : ""
+        const message = `Model not found: ${err.providerID}/${err.modelID}.${hint}`
         yield* events.publish(Session.Event.Error, {
           sessionID,
           error: new NamedError.Unknown({
-            message: `Model not found: ${err.providerID}/${err.modelID}.${hint}`,
+            message,
           }).toObject(),
         })
+        // Fail with a typed message so clients (e.g. coding VL describe) can fall back to OCR
+        // instead of receiving a generic "Unexpected server error".
+        return yield* Effect.fail(new NamedError.Unknown({ message }))
       }
       return yield* Effect.die(err)
     })

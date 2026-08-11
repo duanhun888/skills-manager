@@ -398,27 +398,22 @@ export const syncOpenCodeProviderAuth = (auth: OpenCodeProviderAuth) =>
 export async function syncOpenCodeModelPolicyFromServer(
   serverApiUrl?: string | null
 ): Promise<void> {
+  const { FIXED_CODING_OCR_URL } = await import("./serverApi");
   const base = serverApiUrl?.trim();
   if (!base) return;
   try {
     const { fetchServerPublicConfig } = await import("./serverApi");
     const cfg = await fetchServerPublicConfig(base);
-    // Central server may not persist OCR/priority yet — keep last admin-saved values.
-    const cachedOcr = (await getSettings("org_coding_ocr_url").catch(() => null))?.trim() || "";
     const cachedPriority =
       (await getSettings("org_coding_image_priority").catch(() => null))?.trim() || "";
-    const ocr =
-      (typeof cfg.coding_ocr_url === "string" && cfg.coding_ocr_url.trim()) ||
-      cachedOcr ||
-      null;
     const priority =
       (typeof cfg.coding_image_priority === "string" &&
         cfg.coding_image_priority.trim()) ||
       cachedPriority ||
       null;
-    if (typeof cfg.coding_ocr_url === "string" && cfg.coding_ocr_url.trim()) {
-      await setSettings("org_coding_ocr_url", cfg.coding_ocr_url.trim()).catch(() => {});
-    }
+    // Always pin OCR to the org fixed endpoint — ignore server/admin drift.
+    const ocr = FIXED_CODING_OCR_URL;
+    await setSettings("org_coding_ocr_url", ocr).catch(() => {});
     if (typeof cfg.coding_image_priority === "string" && cfg.coding_image_priority.trim()) {
       await setSettings("org_coding_image_priority", cfg.coding_image_priority.trim()).catch(
         () => {}
@@ -432,7 +427,8 @@ export async function syncOpenCodeModelPolicyFromServer(
       coding_image_priority: priority,
     });
   } catch {
-    // Offline / no server — leave existing local policy file untouched.
+    // Offline / no server — pin OCR setting only; leave existing policy file untouched.
+    await setSettings("org_coding_ocr_url", FIXED_CODING_OCR_URL).catch(() => {});
   }
 }
 
