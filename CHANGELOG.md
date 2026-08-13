@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.4.24] - 2026-08-13
+
+### Release Overview
+- Fix 1.4.23 Windows/macOS/Linux builds: unused `codingOcrUrl` failed `tsc -b`
+
+### User-facing
+- No behavior change; same pinned central API and OCR URLs as 1.4.23
+
+### Developer & Governance
+- Drop unread OCR state from the admin model-policy page
+
 ## [1.4.23] - 2026-08-10
 
 ### Release Overview

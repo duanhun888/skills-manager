@@ -40,7 +40,6 @@ export function AdminModelPolicy() {
   const [mode, setMode] = useState<PolicyMode>("open");
   const [modelsText, setModelsText] = useState(DEFAULT_MODELS);
   const [codingVisionModel, setCodingVisionModel] = useState("alibaba-cn/qwen3-vl-plus");
-  const [codingOcrUrl, setCodingOcrUrl] = useState("");
   const [imagePriority, setImagePriority] = useState<ImagePriority>("ocr_then_vl");
 
   const load = useCallback(async () => {
@@ -54,7 +53,6 @@ export function AdminModelPolicy() {
       const models = cfg.requirements_only_models ?? [];
       setModelsText(models.length > 0 ? models.join("\n") : DEFAULT_MODELS);
       setCodingVisionModel(cfg.coding_vision_model?.trim() || "");
-      setCodingOcrUrl(FIXED_CODING_OCR_URL);
       setImagePriority(parseImagePriority(cachedPriority || cfg.coding_image_priority));
     } catch (err) {
       toast.error(getErrorMessage(err, t("common.error")));
@@ -96,8 +94,6 @@ export function AdminModelPolicy() {
         coding_ocr_url: ocrUrl,
         coding_image_priority: imagePriority,
       });
-      // Keep the values just saved — server reload often cannot echo OCR yet.
-      setCodingOcrUrl(ocrUrl);
       setImagePriority(imagePriority);
       toast.success(t("admin.policy.saved"));
     } catch (err) {
