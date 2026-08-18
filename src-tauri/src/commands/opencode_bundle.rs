@@ -433,30 +433,30 @@ fn opencode_user_config_dir() -> PathBuf {
     if let Ok(xdg) = std::env::var("XDG_CONFIG_HOME") {
         let trimmed = xdg.trim();
         if !trimmed.is_empty() {
-            return PathBuf::from(trimmed).join("opencode");
+            return PathBuf::from(trimmed).join("xh-skills");
         }
     }
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join(".config")
-        .join("opencode")
+        .join("xh-skills")
 }
 
 fn opencode_managed_config_dir() -> PathBuf {
     #[cfg(windows)]
     {
         if let Ok(program_data) = std::env::var("ProgramData") {
-            return PathBuf::from(program_data).join("opencode");
+            return PathBuf::from(program_data).join("xh-skills");
         }
-        return PathBuf::from(r"C:\ProgramData\opencode");
+        return PathBuf::from(r"C:\ProgramData\xh-skills");
     }
     #[cfg(target_os = "macos")]
     {
-        return PathBuf::from("/Library/Application Support/opencode");
+        return PathBuf::from("/Library/Application Support/xh-skills");
     }
     #[cfg(not(any(windows, target_os = "macos")))]
     {
-        PathBuf::from("/etc/opencode")
+        PathBuf::from("/etc/xh-skills")
     }
 }
 
@@ -662,14 +662,14 @@ fn opencode_user_data_dir() -> PathBuf {
     if let Ok(xdg) = std::env::var("XDG_DATA_HOME") {
         let trimmed = xdg.trim();
         if !trimmed.is_empty() {
-            return PathBuf::from(trimmed).join("opencode");
+            return PathBuf::from(trimmed).join("xh-skills");
         }
     }
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join(".local")
         .join("share")
-        .join("opencode")
+        .join("xh-skills")
 }
 
 /// Pretty-print a model id for OpenCode model picker labels.

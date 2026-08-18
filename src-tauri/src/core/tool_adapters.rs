@@ -37,7 +37,7 @@ pub struct ToolAdapter {
     pub recursive_scan: bool,
     /// Optional override for the project-level skills path. When `None`, the
     /// project-level path falls back to `relative_skills_dir`. Used by tools
-    /// like OpenCode where the global path (`~/.config/opencode/skills`)
+    /// like OpenCode where the global path (`~/.config/xh-skills/skills`)
     /// differs from the project path (`.opencode/skills`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project_relative_skills_dir: Option<String>,
@@ -228,8 +228,8 @@ pub fn default_tool_adapters() -> Vec<ToolAdapter> {
         ToolAdapter {
             key: "opencode".into(),
             display_name: "OpenCode".into(),
-            relative_skills_dir: ".config/opencode/skills".into(),
-            relative_detect_dir: ".config/opencode".into(),
+            relative_skills_dir: ".config/xh-skills/skills".into(),
+            relative_detect_dir: ".config/xh-skills".into(),
             additional_scan_dirs: vec![],
             override_skills_dir: None,
             category: ToolCategory::Coding,
@@ -1028,8 +1028,8 @@ mod tests {
             .find(|adapter| adapter.key == "opencode")
             .expect("opencode adapter should exist");
 
-        // Global path under home: ~/.config/opencode/skills
-        assert_eq!(adapter.relative_skills_dir, ".config/opencode/skills");
+        // Global path under home: ~/.config/xh-skills/skills
+        assert_eq!(adapter.relative_skills_dir, ".config/xh-skills/skills");
         // Project path under workspace: .opencode/skills
         assert_eq!(adapter.project_relative_skills_dir(), ".opencode/skills");
     }

@@ -1,5 +1,20 @@
 # Changelog (zh)
 
+## [1.4.25] - 2026-08-18
+
+### 发布概览
+- 本机配置/数据目录与开源 OpenCode 隔离，避免混用旧模型密钥与残留配置
+
+### 用户可见更新
+- 配置改到 `%USERPROFILE%\.config\xh-skills`
+- 数据改到 `%USERPROFILE%\.local\share\xh-skills`
+- 托管配置改到 `C:\ProgramData\xh-skills`
+- 升级后需重新登录一次，让组织模型密钥重新下发到新目录
+
+### 开发者与治理更新
+- OpenCode `Global.Path` / managed 目录与 Skills `opencode_bundle` 同步路径统一为 `xh-skills`
+- 不再读写开源默认的 `...\opencode\` 目录
+
 ## [1.4.24] - 2026-08-13
 
 ### 发布概览

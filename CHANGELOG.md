@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.4.25] - 2026-08-18
+
+### Release Overview
+- Isolate local config/data dirs from open-source OpenCode so stale personal model keys cannot leak in
+
+### User-facing
+- Config moves to `%USERPROFILE%\.config\xh-skills`
+- Data moves to `%USERPROFILE%\.local\share\xh-skills`
+- Managed config moves to `C:\ProgramData\xh-skills`
+- After upgrade, sign in once so org provider keys are re-synced into the new dirs
+
+### Developer & Governance
+- OpenCode `Global.Path` / managed dirs and Skills `opencode_bundle` sync paths all use `xh-skills`
+- No longer reads/writes the stock `...\opencode\` directories
+
 ## [1.4.24] - 2026-08-13
 
 ### Release Overview
