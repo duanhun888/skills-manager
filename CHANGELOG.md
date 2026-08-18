@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.4.26] - 2026-08-18
+
+### Release Overview
+- Do not poll org config on a timer (that jittered the desktop UI); skip disk writes when JSON is unchanged
+
+### User-facing
+- Login waits for the first org config write
+- Opening the coding workbench still syncs once
+- Identical config does not bump file mtimes, so OpenCode will not flash
+
+### Developer & Governance
+- Removed Skills foreground `setInterval` / `focus` sync
+- `write_if_changed` for policy, org keys, and `opencode.json`
+
 ## [1.4.25] - 2026-08-18
 
 ### Release Overview

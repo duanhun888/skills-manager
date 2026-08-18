@@ -503,6 +503,39 @@ fn expand_requirements_only_models(models: &[String]) -> Vec<String> {
     out
 }
 
+fn json_text_equal(existing: &str, next: &str) -> bool {
+    let left = existing.trim();
+    let right = next.trim();
+    if left == right {
+        return true;
+    }
+    match (
+        serde_json::from_str::<serde_json::Value>(left),
+        serde_json::from_str::<serde_json::Value>(right),
+    ) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => false,
+    }
+}
+
+fn write_if_changed(path: &Path, text: &str) -> std::io::Result<bool> {
+    if let Ok(existing) = std::fs::read_to_string(path) {
+        if json_text_equal(&existing, text) {
+            return Ok(false);
+        }
+    }
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let payload = if text.ends_with('\n') {
+        text.to_string()
+    } else {
+        format!("{text}\n")
+    };
+    std::fs::write(path, payload)?;
+    Ok(true)
+}
+
 fn write_policy_file(dir: &Path, policy: &OpenCodeModelPolicyDto) -> Result<(), AppError> {
     std::fs::create_dir_all(dir)
         .map_err(|e| AppError::io(format!("create opencode config dir failed: {e}")))?;
@@ -542,7 +575,7 @@ fn write_policy_file(dir: &Path, policy: &OpenCodeModelPolicyDto) -> Result<(), 
     });
     let text = serde_json::to_string_pretty(&body)
         .map_err(|e| AppError::internal(format!("serialize model policy failed: {e}")))?;
-    std::fs::write(&path, text)
+    write_if_changed(&path, &text)
         .map_err(|e| AppError::io(format!("write {}: {e}", path.display())))?;
     Ok(())
 }
@@ -879,11 +912,9 @@ fn write_org_provider_models_config(
         let Ok(text) = serde_json::to_string_pretty(&merged) else {
             continue;
         };
-        if let Some(parent) = path.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-        if std::fs::write(&path, format!("{text}\n")).is_ok() {
-            written.push(path.display().to_string());
+        match write_if_changed(&path, &text) {
+            Ok(true) => written.push(path.display().to_string()),
+            _ => {}
         }
     }
     written
@@ -958,11 +989,9 @@ pub async fn sync_opencode_provider_auth(
             opencode_managed_config_dir().join("skills-org-auth.json"),
         ];
         for path in &auth_paths {
-            if let Some(parent) = path.parent() {
-                let _ = std::fs::create_dir_all(parent);
-            }
-            if std::fs::write(path, &text).is_ok() {
-                written.push(path.display().to_string());
+            match write_if_changed(path, &text) {
+                Ok(_) => written.push(path.display().to_string()),
+                Err(_) => {}
             }
         }
         if written.is_empty() {
@@ -982,10 +1011,7 @@ pub async fn sync_opencode_provider_auth(
             opencode_managed_config_dir().join("skills-org-providers.json"),
             opencode_user_data_dir().join("skills-org-providers.json"),
         ] {
-            if let Some(parent) = marker_path.parent() {
-                let _ = std::fs::create_dir_all(parent);
-            }
-            let _ = std::fs::write(&marker_path, &marker_text);
+            let _ = write_if_changed(&marker_path, &marker_text);
         }
 
         let config_written = write_org_provider_models_config(&models_map);

@@ -158,11 +158,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setStoredToken(result.access_token);
       setUser(result.user);
       await loadPermissions(serverApiUrl, result.access_token);
-      void api.syncOpenCodeOrgConfigFromServer(
+      await api.syncOpenCodeOrgConfigFromServer(
         serverApiUrl,
         result.access_token,
         result.user.id
-      );
+      ).catch((err) => {
+        console.warn("Org config sync after login failed:", err);
+      });
     },
     [serverApiUrl, loadPermissions]
   );
