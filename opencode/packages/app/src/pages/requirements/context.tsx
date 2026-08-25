@@ -42,6 +42,7 @@ function migrateIntegration(value: unknown): RequirementIntegration {
     baseUrl: typeof value.baseUrl === "string" ? value.baseUrl : "",
     apifoxUrl: typeof value.apifoxUrl === "string" ? value.apifoxUrl : "",
     apifoxProjectId: typeof value.apifoxProjectId === "string" ? value.apifoxProjectId : "",
+    apifoxFolderId: typeof value.apifoxFolderId === "string" ? value.apifoxFolderId : "",
     apifoxAccessToken: typeof value.apifoxAccessToken === "string" ? value.apifoxAccessToken : "",
     tapdUrl: typeof value.tapdUrl === "string" ? value.tapdUrl : "",
     tapdWorkspaceId: typeof value.tapdWorkspaceId === "string" ? value.tapdWorkspaceId : "",

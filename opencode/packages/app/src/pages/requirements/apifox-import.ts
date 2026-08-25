@@ -15,6 +15,8 @@ export type FetchApifoxOpenApiInput = {
   accessToken: string
   /** Optional: only export these module IDs. When omitted, all modules are tried. */
   moduleIds?: number[]
+  /** Optional: only export these folder / directory IDs (and their children). */
+  folderIds?: number[]
   fetch?: typeof fetch
   signal?: AbortSignal
 }
@@ -342,14 +344,30 @@ export async function listApifoxModules(input: FetchApifoxOpenApiInput): Promise
   return { modules: parseApifoxModules(result.doc) }
 }
 
+function normalizeFolderIds(ids?: number[]): number[] {
+  if (!ids?.length) return []
+  const seen = new Set<number>()
+  const out: number[] = []
+  for (const id of ids) {
+    if (!Number.isInteger(id) || id <= 0 || seen.has(id)) continue
+    seen.add(id)
+    out.push(id)
+  }
+  return out
+}
+
 async function exportOpenApiDoc(
   input: FetchApifoxOpenApiInput,
   moduleId?: number,
 ): Promise<RequestResult> {
   const projectId = input.projectId.trim()
   const token = input.accessToken.trim()
+  const folderIds = normalizeFolderIds(input.folderIds)
   const body: Record<string, unknown> = {
-    scope: { type: "ALL" },
+    scope:
+      folderIds.length > 0
+        ? { type: "SELECTED_FOLDERS", selectedFolderIds: folderIds }
+        : { type: "ALL" },
     options: {
       includeApifoxExtensionProperties: false,
       addFoldersToTags: false,
@@ -376,11 +394,35 @@ function withModulePrefix(apis: ApifoxOpenApiOperation[], moduleName?: string): 
   }))
 }
 
+async function exportModules(
+  input: FetchApifoxOpenApiInput,
+  modules: ApifoxModule[],
+): Promise<{ apis: ApifoxOpenApiOperation[]; error?: string }> {
+  const merged: ApifoxOpenApiOperation[] = []
+  let lastError: string | undefined
+  const results = await Promise.all(
+    modules.map(async (mod) => {
+      const exported = await exportOpenApiDoc(input, mod.id)
+      if (!exported.ok) return { apis: [] as ApifoxOpenApiOperation[], error: exported.error }
+      const unwrapped = unwrapData(exported.doc)
+      const apis = withModulePrefix(parseOpenApiOperations(unwrapped), mod.name)
+      return { apis, error: undefined as string | undefined }
+    }),
+  )
+  for (const result of results) {
+    if (result.error) lastError = result.error
+    merged.push(...result.apis)
+  }
+  return { apis: dedupeAndSort(merged), error: lastError }
+}
+
 /**
  * Export OpenAPI endpoints from Apifox.
  *
  * Multi-module projects only include the default module when `moduleId` is omitted.
  * Prefer OpenAPI exports (include request/response summaries) over the flat http-apis index.
+ * When `folderIds` is set, export that directory only (`SELECTED_FOLDERS`) — do not fall back
+ * to the whole project.
  */
 export async function fetchApifoxApiOperations(
   input: FetchApifoxOpenApiInput,
@@ -389,6 +431,30 @@ export async function fetchApifoxApiOperations(
   const token = input.accessToken.trim()
   if (!projectId || !token) {
     return { apis: [], error: "missing_project_or_token" }
+  }
+
+  const folderIds = normalizeFolderIds(input.folderIds)
+  if (folderIds.length > 0) {
+    const scoped = await exportOpenApiDoc(input)
+    if (scoped.ok) {
+      const apis = parseOpenApiOperations(unwrapData(scoped.doc))
+      if (apis.length > 0) return { apis }
+    } else if (scoped.status === 401 || scoped.status === 403) {
+      return { apis: [], error: scoped.error }
+    }
+
+    const listed = await listApifoxModules(input)
+    if (listed.error?.startsWith("unauthorized") || listed.error === "missing_project_or_token") {
+      return { apis: [], error: listed.error }
+    }
+    if (listed.modules.length > 0) {
+      const merged = await exportModules(input, listed.modules)
+      if (merged.apis.length > 0) return { apis: merged.apis }
+      if (merged.error?.startsWith("unauthorized")) return { apis: [], error: merged.error }
+    }
+
+    if (!scoped.ok) return { apis: [], error: scoped.error }
+    return { apis: [], error: "empty_openapi" }
   }
 
   // 1) Per-module OpenAPI export (schemas)
@@ -405,24 +471,9 @@ export async function fetchApifoxApiOperations(
   }
 
   if (modules.length > 0) {
-    const merged: ApifoxOpenApiOperation[] = []
-    let lastError: string | undefined
-    const results = await Promise.all(
-      modules.map(async (mod) => {
-        const exported = await exportOpenApiDoc(input, mod.id)
-        if (!exported.ok) return { apis: [] as ApifoxOpenApiOperation[], error: exported.error }
-        const unwrapped = unwrapData(exported.doc)
-        const apis = withModulePrefix(parseOpenApiOperations(unwrapped), mod.name)
-        return { apis, error: undefined as string | undefined }
-      }),
-    )
-    for (const result of results) {
-      if (result.error) lastError = result.error
-      merged.push(...result.apis)
-    }
-    const apis = dedupeAndSort(merged)
-    if (apis.length > 0) return { apis }
-    if (lastError?.startsWith("unauthorized")) return { apis: [], error: lastError }
+    const merged = await exportModules(input, modules)
+    if (merged.apis.length > 0) return { apis: merged.apis }
+    if (merged.error?.startsWith("unauthorized")) return { apis: [], error: merged.error }
   }
 
   // 2) Default-module OpenAPI export

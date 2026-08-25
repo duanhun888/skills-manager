@@ -81,6 +81,7 @@ export function formatConnectorContext(integration?: RequirementIntegration): st
   if (isApifoxConnected(value)) {
     lines.push("- Apifox: connected")
     if (value.apifoxProjectId.trim()) lines.push(`  - Project ID: ${value.apifoxProjectId.trim()}`)
+    if (value.apifoxFolderId.trim()) lines.push(`  - Directory ID: ${value.apifoxFolderId.trim()}`)
     if (value.apifoxUrl.trim()) lines.push(`  - URL: ${value.apifoxUrl.trim()}`)
     if (value.envName.trim()) lines.push(`  - Environment: ${value.envName.trim()}`)
     if (value.baseUrl.trim()) lines.push(`  - API Base URL: ${value.baseUrl.trim()}`)

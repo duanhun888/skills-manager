@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.27] - 2026-08-25
+
+### Release Overview
+- Apifox connector can import APIs from a specific directory, not only the whole project
+
+### User-facing
+- New optional Directory ID field on the Apifox connector
+- Import uses that folder and its children; leave empty to keep whole-project import
+
+### Developer & Governance
+- OpenAPI export uses `SELECTED_FOLDERS` and does not fall back to the full project catalog
+
 ## [1.4.26] - 2026-08-18
 
 ### Release Overview

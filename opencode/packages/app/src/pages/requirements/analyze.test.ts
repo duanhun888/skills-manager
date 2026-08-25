@@ -108,12 +108,15 @@ describe("requirement analysis helpers", () => {
     const text = formatConnectorContext({
       ...EMPTY_INTEGRATION,
       apifoxProjectId: "1",
+      apifoxFolderId: "20406855",
       apifoxAccessToken: "apifox-should-not-leak",
       tapdWorkspaceId: "64516772",
       tapdAccessToken: "should-not-leak",
       apis: [{ id: "a1", method: "GET", path: "/goods", name: "列表" }],
     })
     expect(text).toContain("Apifox: connected")
+    expect(text).toContain("Project ID: 1")
+    expect(text).toContain("Directory ID: 20406855")
     expect(text).toContain("TAPD: connected")
     expect(text).toContain("64516772")
     expect(text).toContain("Required APIs in this workbench: 1 total")

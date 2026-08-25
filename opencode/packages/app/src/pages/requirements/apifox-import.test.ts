@@ -262,4 +262,73 @@ describe("apifox import", () => {
     expect(result.apis).toEqual([])
     expect(result.error).toBe("empty_openapi")
   })
+
+  test("fetchApifoxApiOperations exports selected folders instead of the whole project", async () => {
+    const exportBodies: unknown[] = []
+    const fetchFn: typeof fetch = async (input, init) => {
+      const url = String(input)
+      if (url.includes("/modules") || url.includes("/http-apis")) {
+        return new Response("nope", { status: 404 })
+      }
+      if (url.includes("export-openapi")) {
+        exportBodies.push(init?.body ? JSON.parse(String(init.body)) : null)
+        return new Response(
+          JSON.stringify({
+            openapi: "3.1.0",
+            paths: {
+              "/portal/inbound": {
+                post: { summary: "入库单" },
+              },
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        )
+      }
+      return new Response("nope", { status: 404 })
+    }
+
+    const result = await fetchApifoxApiOperations({
+      projectId: "3162721",
+      accessToken: "tok",
+      folderIds: [20406855],
+      fetch: fetchFn,
+    })
+
+    expect(exportBodies).toEqual([
+      expect.objectContaining({
+        scope: { type: "SELECTED_FOLDERS", selectedFolderIds: [20406855] },
+      }),
+    ])
+    expect(result.error).toBeUndefined()
+    expect(result.apis).toEqual([{ method: "POST", path: "/portal/inbound", name: "入库单" }])
+  })
+
+  test("fetchApifoxApiOperations does not fall back to all APIs when a folder is empty", async () => {
+    let httpApisCalled = false
+    const fetchFn: typeof fetch = async (input) => {
+      const url = String(input)
+      if (url.includes("/http-apis")) {
+        httpApisCalled = true
+        return new Response(
+          JSON.stringify({ data: [{ method: "GET", path: "/whole-project", name: "全部" }] }),
+          { status: 200 },
+        )
+      }
+      if (url.includes("/modules")) {
+        return new Response(JSON.stringify({ data: [] }), { status: 200 })
+      }
+      return new Response(JSON.stringify({ openapi: "3.1.0", paths: {} }), { status: 200 })
+    }
+
+    const result = await fetchApifoxApiOperations({
+      projectId: "3162721",
+      accessToken: "tok",
+      folderIds: [20406855],
+      fetch: fetchFn,
+    })
+
+    expect(httpApisCalled).toBe(false)
+    expect(result.apis).toEqual([])
+    expect(result.error).toBe("empty_openapi")
+  })
 })

@@ -13,10 +13,12 @@ import {
   APIFOX_TOKEN_DOCS,
   buildApifoxMcpConfig,
   buildApifoxMcpEntry,
+  extractApifoxFolderId,
   extractApifoxProjectId,
   isApifoxReady,
   mergeApiRefs,
   parseApiLines,
+  parseApifoxFolderIds,
   resolveApifoxMcpServerName,
 } from "./apifox"
 import { canImportApifoxApis, fetchApifoxApiOperations, type ApifoxOpenApiOperation } from "./apifox-import"
@@ -94,16 +96,27 @@ export function DialogIntegrationConfig(props: { projectId: string }) {
   const onApifoxBind = (value: string) => {
     const trimmed = value.trim()
     const extracted = extractApifoxProjectId(trimmed)
+    const folderFromUrl = extractApifoxFolderId(trimmed)
     const looksLikeUrl = /apifox\.com|https?:\/\//i.test(trimmed)
     if (!trimmed) {
       patch({ apifoxUrl: "", apifoxProjectId: "" })
       return
     }
     if (looksLikeUrl) {
-      patch({ apifoxUrl: trimmed, apifoxProjectId: extracted ?? "" })
+      patch({
+        apifoxUrl: trimmed,
+        apifoxProjectId: extracted ?? "",
+        ...(folderFromUrl && !/^\d+$/.test(trimmed) ? { apifoxFolderId: folderFromUrl } : {}),
+      })
       return
     }
     patch({ apifoxUrl: "", apifoxProjectId: extracted ?? trimmed })
+  }
+
+  const onFolderBind = (value: string) => {
+    const extracted = extractApifoxFolderId(value)
+    const looksLikeUrl = /apifox\.com|folder-/i.test(value)
+    patch({ apifoxFolderId: looksLikeUrl && extracted ? extracted : value })
   }
 
   const addApi = () => {
@@ -235,16 +248,20 @@ export function DialogIntegrationConfig(props: { projectId: string }) {
     if (importing()) return
     setImporting(true)
     try {
+      const folderIds = parseApifoxFolderIds(integration().apifoxFolderId)
       const { apis, error } = await fetchApifoxApiOperations({
         projectId: resolvedProjectId(),
         accessToken: accessToken(),
+        folderIds: folderIds.length > 0 ? folderIds : undefined,
         fetch: platform.fetch ?? fetch,
       })
       if (error || apis.length === 0) {
         showToast({
           title: language.t("requirements.integration.importFailed"),
           description: error === "empty_openapi"
-            ? language.t("requirements.integration.importEmpty")
+            ? folderIds.length > 0
+              ? language.t("requirements.integration.importEmptyFolder")
+              : language.t("requirements.integration.importEmpty")
             : error,
         })
         return
@@ -416,6 +433,18 @@ export function DialogIntegrationConfig(props: { projectId: string }) {
               {language.t("requirements.integration.resolvedId", { id: resolvedProjectId() })}
             </p>
           </Show>
+          <label data-component="requirements-integ-field">
+            <span>{language.t("requirements.integration.folderId")}</span>
+            <TextInputV2
+              value={integration().apifoxFolderId}
+              placeholder={language.t("requirements.integration.folderIdPlaceholder")}
+              onInput={(event) => onFolderBind(event.currentTarget.value)}
+              showClearButton={!!integration().apifoxFolderId.trim()}
+              clearLabel={language.t("common.clear")}
+              onClearClick={() => patch({ apifoxFolderId: "" })}
+            />
+          </label>
+          <p data-component="requirements-integ-meta">{language.t("requirements.integration.folderIdHint")}</p>
         </section>
 
         <section data-component="requirements-integ-section">

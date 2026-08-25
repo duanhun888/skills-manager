@@ -50,6 +50,8 @@ export type RequirementIntegration = {
   apifoxUrl: string
   /** Apifox project id for MCP (`--project-id=`) */
   apifoxProjectId: string
+  /** Apifox folder / directory id — import only this folder (and children). Empty = whole project. */
+  apifoxFolderId: string
   /** Apifox API access token (local only; never sent in coding brief) */
   apifoxAccessToken: string
   /** TAPD project / workspace link */
@@ -71,6 +73,7 @@ export const EMPTY_INTEGRATION: RequirementIntegration = {
   baseUrl: "",
   apifoxUrl: "",
   apifoxProjectId: "",
+  apifoxFolderId: "",
   apifoxAccessToken: "",
   tapdUrl: "",
   tapdWorkspaceId: "",

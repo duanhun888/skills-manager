@@ -9,6 +9,7 @@ export function isSharedIntegrationEmpty(integration?: RequirementIntegration): 
     !value.baseUrl.trim() &&
     !value.apifoxUrl.trim() &&
     !value.apifoxProjectId.trim() &&
+    !value.apifoxFolderId.trim() &&
     !value.apifoxAccessToken.trim() &&
     !value.tapdUrl.trim() &&
     !value.tapdWorkspaceId.trim() &&
@@ -39,6 +40,7 @@ export function inheritSystemIntegration(
       baseUrl: source.baseUrl,
       apifoxUrl: source.apifoxUrl,
       apifoxProjectId: source.apifoxProjectId,
+      apifoxFolderId: source.apifoxFolderId,
       apifoxAccessToken: source.apifoxAccessToken,
       tapdUrl: source.tapdUrl,
       tapdWorkspaceId: source.tapdWorkspaceId,
@@ -62,6 +64,31 @@ export function extractApifoxProjectId(input: string): string | undefined {
   return match?.[1]
 }
 
+/** Extract Apifox folder / directory id from URLs (`folder-20406855`) or a raw numeric id. */
+export function extractApifoxFolderId(input: string): string | undefined {
+  const trimmed = input.trim()
+  if (!trimmed) return
+  if (/^\d+$/.test(trimmed)) return trimmed
+  const match =
+    trimmed.match(/folder-(\d+)/i) ??
+    trimmed.match(/[?&](?:folderId|folderIds)=(\d+)/i) ??
+    trimmed.match(/\/folders\/(\d+)/i)
+  return match?.[1]
+}
+
+/** Parse one or more folder ids from a form field (`20406855` or `1, 2`). */
+export function parseApifoxFolderIds(input: string): number[] {
+  const seen = new Set<number>()
+  const out: number[] = []
+  for (const part of input.split(/[,，\s]+/)) {
+    const id = Number(extractApifoxFolderId(part) ?? part.trim())
+    if (!Number.isInteger(id) || id <= 0 || seen.has(id)) continue
+    seen.add(id)
+    out.push(id)
+  }
+  return out
+}
+
 export function isIntegrationEmpty(integration?: RequirementIntegration): boolean {
   const value = integration ?? EMPTY_INTEGRATION
   return (
@@ -69,6 +96,7 @@ export function isIntegrationEmpty(integration?: RequirementIntegration): boolea
     !value.baseUrl.trim() &&
     !value.apifoxUrl.trim() &&
     !value.apifoxProjectId.trim() &&
+    !value.apifoxFolderId.trim() &&
     !value.apifoxAccessToken.trim() &&
     !value.tapdUrl.trim() &&
     !value.tapdWorkspaceId.trim() &&

@@ -1536,6 +1536,18 @@
   word-break: break-all;
 }
 
+[data-component="requirements-integ-field"] {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+[data-component="requirements-integ-field"] > span {
+  font-size: 12px;
+  color: var(--v2-text-text-weak);
+}
+
 [data-component="requirements-integ-env-grid"] {
   display: grid;
   grid-template-columns: 1fr;

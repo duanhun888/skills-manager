@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import {
   buildApifoxMcpConfig,
+  extractApifoxFolderId,
   extractApifoxProjectId,
   formatApiRef,
   inheritSystemIntegration,
@@ -9,6 +10,7 @@ import {
   isSharedIntegrationEmpty,
   mergeApiRefs,
   parseApiLines,
+  parseApifoxFolderIds,
 } from "./apifox"
 import { EMPTY_INTEGRATION, type RequirementProject } from "./types"
 
@@ -17,6 +19,14 @@ describe("apifox helpers", () => {
     expect(extractApifoxProjectId("https://app.apifox.com/project/6980123/apis")).toBe("6980123")
     expect(extractApifoxProjectId("6980123")).toBe("6980123")
     expect(extractApifoxProjectId("")).toBeUndefined()
+  })
+
+  test("extracts folder id from url or raw id", () => {
+    expect(extractApifoxFolderId("https://app.apifox.com/project/3162721/apis/folder-20406855")).toBe("20406855")
+    expect(extractApifoxFolderId("20406855")).toBe("20406855")
+    expect(extractApifoxFolderId("")).toBeUndefined()
+    expect(parseApifoxFolderIds("20406855, 11")).toEqual([20406855, 11])
+    expect(parseApifoxFolderIds("folder-20406855")).toEqual([20406855])
   })
 
   test("builds OpenCode mcp config", () => {
@@ -107,6 +117,7 @@ GET /a — detail
   test("detects empty integration and ready state", () => {
     expect(isIntegrationEmpty(EMPTY_INTEGRATION)).toBe(true)
     expect(isIntegrationEmpty({ ...EMPTY_INTEGRATION, apifoxProjectId: "1" })).toBe(false)
+    expect(isIntegrationEmpty({ ...EMPTY_INTEGRATION, apifoxFolderId: "20406855" })).toBe(false)
     expect(isApifoxReady({ ...EMPTY_INTEGRATION, apifoxProjectId: "1" })).toBe(false)
     expect(isApifoxReady({ ...EMPTY_INTEGRATION, apifoxProjectId: "1", apifoxAccessToken: "t" })).toBe(true)
   })
@@ -135,6 +146,7 @@ GET /a — detail
           baseUrl: "https://api.example.com",
           apifoxProjectId: "42",
           apifoxAccessToken: "shared-token",
+          apifoxFolderId: "20406855",
           notes: "Bearer via gateway",
           apis: [{ id: "a2", method: "POST", path: "/newer", name: "x" }],
         },
@@ -152,6 +164,7 @@ GET /a — detail
       baseUrl: "https://api.example.com",
       apifoxUrl: "",
       apifoxProjectId: "42",
+      apifoxFolderId: "20406855",
       apifoxAccessToken: "shared-token",
       tapdUrl: "",
       tapdWorkspaceId: "",

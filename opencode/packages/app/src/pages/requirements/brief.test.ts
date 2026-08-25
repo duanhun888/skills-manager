@@ -43,6 +43,7 @@ describe("serializeRequirementBrief", () => {
         baseUrl: "https://api-test.example.com",
         apifoxUrl: "https://app.apifox.com/project/1",
         apifoxProjectId: "1",
+        apifoxFolderId: "",
         apifoxAccessToken: "apifox-secret-should-not-leak",
         tapdUrl: "",
         tapdWorkspaceId: "",

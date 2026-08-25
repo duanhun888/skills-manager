@@ -72,6 +72,9 @@ export function serializeRequirementBrief(
           integration.apifoxProjectId.trim()
             ? `- Apifox Project ID (MCP): ${integration.apifoxProjectId.trim()}`
             : undefined,
+          integration.apifoxFolderId.trim()
+            ? `- Apifox Directory ID: ${integration.apifoxFolderId.trim()}`
+            : undefined,
           // Never include apifoxAccessToken in coding brief
           integration.tapdUrl.trim() ? `- TAPD URL: ${integration.tapdUrl.trim()}` : undefined,
           integration.tapdWorkspaceId.trim()
